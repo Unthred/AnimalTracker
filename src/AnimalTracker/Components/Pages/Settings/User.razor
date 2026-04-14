@@ -1,0 +1,177 @@
+@page "/settings"
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+
+@using AnimalTracker.Services
+@inject UserSettingsService Settings
+@inject AnimalTracker.State.UserPreferencesState Prefs
+
+<PageTitle>User settings</PageTitle>
+
+<h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Settings</h2>
+<p class="mt-1 text-sm text-slate-600 dark:text-slate-300">Locations and user preferences.</p>
+
+<div class="mt-6">
+    <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-50">User preferences</h3>
+    <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">Customize how the app looks and behaves for your account.</p>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(message))
+{
+    <div class="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-800 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100">
+        @message
+    </div>
+}
+
+<EditForm Model="model" OnValidSubmit="SaveAsync" class="mt-6 space-y-6">
+    <DataAnnotationsValidator />
+
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div>
+            <label class="block text-sm font-medium text-slate-700 dark:text-slate-200" for="accent">Highlight color</label>
+            <div class="mt-1 flex items-center gap-3">
+                <input id="accent" type="color" class="h-10 w-14 cursor-pointer rounded border border-slate-300 bg-white p-1 dark:border-slate-700 dark:bg-slate-900"
+                       @bind="model.AccentColorHex" />
+                <input type="text" class="w-32 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+                       @bind="model.AccentColorHex" />
+            </div>
+            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Hex format like #22c55e</p>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-slate-700 dark:text-slate-200" for="pageSize">Timeline page size</label>
+            <select id="pageSize" class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+                    @bind="model.TimelinePageSize">
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+            </select>
+        </div>
+    </div>
+
+    <div>
+        <label class="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+            <InputCheckbox class="h-4 w-4 rounded border-slate-300 dark:border-slate-700" @bind-Value="model.CompactMode" />
+            Compact mode (tighter spacing)
+        </label>
+    </div>
+
+    <div class="flex items-center justify-end gap-2">
+        <button type="submit" class="btn btn-primary">
+            Save
+        </button>
+    </div>
+</EditForm>
+
+<div class="mt-10">
+    <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-50">Locations</h3>
+    <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">Where sightings occur.</p>
+</div>
+
+<div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+    <div>
+        <label class="block text-sm font-medium text-slate-700 dark:text-slate-200" for="name">New location name</label>
+        <input id="name" class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+               @bind="newLocationName" />
+    </div>
+    <div class="flex items-end">
+        <button class="btn btn-primary" @onclick="CreateLocationAsync">
+            Add
+        </button>
+    </div>
+</div>
+
+<div class="mt-6">
+    @if (locationsLoading)
+    {
+        <p class="text-sm text-slate-600 dark:text-slate-300">Loading…</p>
+    }
+    else if (locations.Count == 0)
+    {
+        <p class="text-sm text-slate-700 dark:text-slate-200">No locations yet.</p>
+    }
+    else
+    {
+        <ul class="divide-y divide-slate-200 rounded-lg border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
+            @foreach (var l in locations)
+            {
+                <li class="p-4">
+                    <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">@l.Name</div>
+                    @if (!string.IsNullOrWhiteSpace(l.Notes))
+                    {
+                        <div class="mt-1 text-sm text-slate-600 dark:text-slate-300">@l.Notes</div>
+                    }
+                </li>
+            }
+        </ul>
+    }
+</div>
+
+@code
+{
+    private string? message;
+    private readonly Model model = new();
+
+    [Inject] private LocationService LocationService { get; set; } = default!;
+
+    private bool locationsLoading = true;
+    private List<AnimalTracker.Data.Entities.Location> locations = [];
+    private string newLocationName = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var s = await Settings.GetOrCreateAsync();
+        model.AccentColorHex = s.AccentColorHex;
+        model.CompactMode = s.CompactMode;
+        model.TimelinePageSize = s.TimelinePageSize;
+
+        locations = await LocationService.GetAllAsync();
+        if (locations.Count == 0)
+        {
+            await LocationService.GetOrCreateDefaultAsync();
+            locations = await LocationService.GetAllAsync();
+        }
+        locationsLoading = false;
+    }
+
+    private async Task SaveAsync()
+    {
+        message = null;
+        try
+        {
+            var saved = await Settings.UpdateAsync(model.AccentColorHex, model.CompactMode, model.TimelinePageSize);
+            model.AccentColorHex = saved.AccentColorHex;
+            model.CompactMode = saved.CompactMode;
+            model.TimelinePageSize = saved.TimelinePageSize;
+            Prefs.Apply(saved);
+            message = "Saved.";
+        }
+        catch (Exception ex)
+        {
+            message = $"Error: {ex.Message}";
+        }
+    }
+
+    private async Task CreateLocationAsync()
+    {
+        if (string.IsNullOrWhiteSpace(newLocationName))
+            return;
+
+        await LocationService.CreateAsync(newLocationName, notes: null);
+        newLocationName = "";
+        locations = await LocationService.GetAllAsync();
+    }
+
+    private sealed class Model
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        public string AccentColorHex { get; set; } = "#0f172a";
+
+        public bool CompactMode { get; set; }
+
+        public int TimelinePageSize { get; set; } = 50;
+    }
+}
+

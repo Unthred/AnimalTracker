@@ -1,0 +1,140 @@
+@page "/sightings/new"
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+
+@using AnimalTracker.Services
+@using AnimalTracker.Data.Entities
+@inject SightingService Sightings
+@inject SpeciesService Species
+@inject LocationService Locations
+@inject NavigationManager Nav
+
+<PageTitle>Add Sighting</PageTitle>
+
+<h2 class="text-lg font-semibold text-slate-900">Add sighting</h2>
+
+<EditForm Model="model" OnValidSubmit="SaveAsync" class="mt-4 space-y-4">
+    <DataAnnotationsValidator />
+
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div>
+            <label class="block text-sm font-medium text-slate-700" for="occurredAt">When</label>
+            <InputDate id="occurredAt" class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+                       @bind-Value="model.OccurredAtLocalDate" />
+            <ValidationMessage For="() => model.OccurredAtLocalDate" />
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-slate-700" for="occurredTime">Time</label>
+            <InputText id="occurredTime" class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+                       @bind-Value="model.OccurredAtLocalTime" />
+            <p class="mt-1 text-xs text-slate-500">24h format, e.g. 14:35</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div>
+            <label class="block text-sm font-medium text-slate-700" for="species">Species</label>
+            <select id="species" class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+                    @bind="model.SpeciesId">
+                <option value="">Select…</option>
+                @foreach (var s in species)
+                {
+                    <option value="@s.Id">@s.Name</option>
+                }
+            </select>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-slate-700" for="location">Location</label>
+            <select id="location" class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+                    @bind="model.LocationId">
+                <option value="">Default</option>
+                @foreach (var l in locations)
+                {
+                    <option value="@l.Id">@l.Name</option>
+                }
+            </select>
+        </div>
+    </div>
+
+    <div>
+        <label class="block text-sm font-medium text-slate-700" for="notes">Notes</label>
+        <InputTextArea id="notes" class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+                       @bind-Value="model.Notes" rows="4" />
+    </div>
+
+    <div class="flex items-center justify-end gap-2">
+        <a class="rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100" href="/">Cancel</a>
+        <button type="submit" class="rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800">
+            Save
+        </button>
+    </div>
+</EditForm>
+
+@code
+{
+    private List<Species> species = [];
+    private List<Location> locations = [];
+
+    private readonly Model model = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        species = await Species.GetAllAsync();
+        locations = await Locations.GetAllAsync();
+        if (locations.Count == 0)
+        {
+            await Locations.GetOrCreateDefaultAsync();
+            locations = await Locations.GetAllAsync();
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        var occurredAtUtc = model.GetOccurredAtUtc();
+        var created = await Sightings.CreateAsync(
+            occurredAtUtc: occurredAtUtc,
+            speciesId: model.SpeciesId!.Value,
+            locationId: model.LocationId,
+            animalId: null,
+            notes: model.Notes);
+
+        Nav.NavigateTo($"/sightings/{created.Id}");
+    }
+
+    private sealed class Model
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        public int? SpeciesId { get; set; }
+
+        public int? LocationId { get; set; }
+
+        [System.ComponentModel.DataAnnotations.Required]
+        public DateTime OccurredAtLocalDate { get; set; } = DateTime.Now.Date;
+
+        public string OccurredAtLocalTime { get; set; } = DateTime.Now.ToString("HH:mm");
+
+        public string? Notes { get; set; }
+
+        public DateTime GetOccurredAtUtc()
+        {
+            if (!TimeOnly.TryParse(OccurredAtLocalTime, out var t))
+                t = new TimeOnly(12, 0);
+
+            var local = new DateTime(
+                OccurredAtLocalDate.Year,
+                OccurredAtLocalDate.Month,
+                OccurredAtLocalDate.Day,
+                t.Hour,
+                t.Minute,
+                0,
+                DateTimeKind.Local);
+
+            return local.ToUniversalTime();
+        }
+    }
+}
+

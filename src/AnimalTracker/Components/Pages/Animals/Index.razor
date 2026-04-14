@@ -1,0 +1,100 @@
+@page "/animals"
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+
+@using AnimalTracker.Services
+@using AnimalTracker.Data.Entities
+@inject AnimalService Animals
+@inject SpeciesService Species
+
+<PageTitle>Animals</PageTitle>
+
+<div class="flex items-center justify-between gap-3">
+    <div>
+        <h2 class="text-lg font-semibold text-slate-900">Animals</h2>
+        <p class="text-sm text-slate-600">Identified individuals you track.</p>
+    </div>
+    <a class="inline-flex items-center rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+       href="animals/new">
+        New animal
+    </a>
+</div>
+
+<div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+    <div class="md:col-span-2">
+        <label class="block text-sm font-medium text-slate-700" for="q">Search</label>
+        <input id="q" class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+               @bind="query" @bind:event="oninput" />
+    </div>
+    <div>
+        <label class="block text-sm font-medium text-slate-700" for="species">Species</label>
+        <select id="species" class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+                @bind="speciesId">
+            <option value="">All</option>
+            @foreach (var s in species)
+            {
+                <option value="@s.Id">@s.Name</option>
+            }
+        </select>
+    </div>
+</div>
+
+<div class="mt-4">
+    <button class="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            @onclick="ReloadAsync">
+        Apply
+    </button>
+</div>
+
+<div class="mt-6">
+    @if (loading)
+    {
+        <p class="text-sm text-slate-600">Loading…</p>
+    }
+    else if (animals.Count == 0)
+    {
+        <p class="text-sm text-slate-700">No animals yet.</p>
+    }
+    else
+    {
+        <ul class="divide-y divide-slate-200 rounded-lg border border-slate-200">
+            @foreach (var a in animals)
+            {
+                <li class="p-4 hover:bg-slate-50">
+                    <a class="block" href="@($"/animals/{a.Id}")">
+                        <div class="text-sm font-semibold text-slate-900">
+                            @(!string.IsNullOrWhiteSpace(a.DisplayName) ? a.DisplayName : $"Animal #{a.Id}")
+                        </div>
+                        <div class="mt-1 text-sm text-slate-600">@a.Species.Name</div>
+                    </a>
+                </li>
+            }
+        </ul>
+    }
+</div>
+
+@code
+{
+    private bool loading = true;
+    private List<Species> species = [];
+    private List<Animal> animals = [];
+
+    private string? query;
+    private int? speciesId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        species = await Species.GetAllAsync();
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        loading = true;
+        animals = await Animals.SearchAsync(query, speciesId);
+        loading = false;
+    }
+}
+

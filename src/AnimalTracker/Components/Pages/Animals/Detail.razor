@@ -1,0 +1,63 @@
+@page "/animals/{Id:int}"
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+
+@using AnimalTracker.Services
+@using AnimalTracker.Data.Entities
+@inject AnimalService Animals
+
+<PageTitle>Animal</PageTitle>
+
+@if (loading)
+{
+    <p class="text-sm text-slate-600">Loading…</p>
+}
+else if (animal is null)
+{
+    <p class="text-sm text-slate-700">Animal not found.</p>
+}
+else
+{
+    <div class="flex items-start justify-between gap-4">
+        <div>
+            <h2 class="text-lg font-semibold text-slate-900">
+                @(!string.IsNullOrWhiteSpace(animal.DisplayName) ? animal.DisplayName : $"Animal #{animal.Id}")
+            </h2>
+            <p class="mt-1 text-sm text-slate-600">@animal.Species.Name</p>
+        </div>
+        <a class="text-sm font-medium text-slate-700 hover:text-slate-900" href="/animals">Back</a>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(animal.IdentifyingFeatures))
+    {
+        <div class="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <div class="text-sm font-semibold text-slate-900">Identifying features</div>
+            <div class="mt-1 text-sm text-slate-700">@animal.IdentifyingFeatures</div>
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(animal.Notes))
+    {
+        <div class="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <div class="text-sm font-semibold text-slate-900">Notes</div>
+            <div class="mt-1 text-sm text-slate-700">@animal.Notes</div>
+        </div>
+    }
+}
+
+@code
+{
+    [Parameter] public int Id { get; set; }
+    private bool loading = true;
+    private Animal? animal;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true;
+        animal = await Animals.GetAsync(Id);
+        loading = false;
+    }
+}
+

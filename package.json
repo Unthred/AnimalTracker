@@ -1,0 +1,13 @@
+{
+  "name": "animaltracker",
+  "private": true,
+  "devDependencies": {
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.17"
+  },
+  "scripts": {
+    "build:css": "tailwindcss -i ./src/AnimalTracker/wwwroot/css/app.css -o ./src/AnimalTracker/wwwroot/css/app.generated.css --minify",
+    "watch:css": "tailwindcss -i ./src/AnimalTracker/wwwroot/css/app.css -o ./src/AnimalTracker/wwwroot/css/app.generated.css --watch"
+  }
+}

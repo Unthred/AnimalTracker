@@ -1,0 +1,89 @@
+﻿@implements IDisposable
+
+@inject NavigationManager NavigationManager
+
+<div class="border-b border-slate-200 bg-white px-4 py-3">
+    <a class="text-base font-semibold text-slate-900" href="">AnimalTracker</a>
+</div>
+
+<div class="px-2 py-3">
+    <nav class="flex flex-col gap-1">
+        <NavLink class="rounded px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 [&.active]:bg-slate-100 [&.active]:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:[&.active]:bg-slate-800 dark:[&.active]:text-slate-50"
+                 href="" Match="NavLinkMatch.All">
+            Timeline
+        </NavLink>
+
+        <NavLink class="rounded px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 [&.active]:bg-slate-100 [&.active]:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:[&.active]:bg-slate-800 dark:[&.active]:text-slate-50"
+                 href="sightings/new">
+            Add sighting
+        </NavLink>
+
+        <NavLink class="rounded px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 [&.active]:bg-slate-100 [&.active]:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:[&.active]:bg-slate-800 dark:[&.active]:text-slate-50"
+                 href="animals">
+            Animals
+        </NavLink>
+
+        <NavLink class="rounded px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 [&.active]:bg-slate-100 [&.active]:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:[&.active]:bg-slate-800 dark:[&.active]:text-slate-50"
+                 href="stats">
+            Stats
+        </NavLink>
+
+        <NavLink class="rounded px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 [&.active]:bg-slate-100 [&.active]:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:[&.active]:bg-slate-800 dark:[&.active]:text-slate-50"
+                 href="settings">
+            Settings
+        </NavLink>
+
+        <!-- User settings merged into Settings -->
+
+        <AuthorizeView>
+            <Authorized>
+                <div class="mt-3 border-t border-slate-200 pt-3 dark:border-slate-800">
+                    <NavLink class="block rounded px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+                             href="Account/Manage">
+                        @context.User.Identity?.Name
+                    </NavLink>
+
+                    <form action="Account/Logout" method="post">
+                        <AntiforgeryToken />
+                        <input type="hidden" name="ReturnUrl" value="@currentUrl" />
+                        <button type="submit" class="w-full rounded px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800">
+                            Logout
+                        </button>
+                    </form>
+                </div>
+            </Authorized>
+            <NotAuthorized>
+                <div class="mt-3 border-t border-slate-200 pt-3 dark:border-slate-800">
+                    <NavLink class="block rounded px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800" href="Account/Register">
+                        Register
+                    </NavLink>
+                    <NavLink class="block rounded px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800" href="Account/Login">
+                        Login
+                    </NavLink>
+                </div>
+            </NotAuthorized>
+        </AuthorizeView>
+    </nav>
+</div>
+
+@code {
+    private string? currentUrl;
+
+    protected override void OnInitialized()
+    {
+        currentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+        NavigationManager.LocationChanged += OnLocationChanged;
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        currentUrl = NavigationManager.ToBaseRelativePath(e.Location);
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= OnLocationChanged;
+    }
+}
+

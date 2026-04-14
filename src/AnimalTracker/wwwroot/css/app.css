@@ -1,0 +1,171 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Allow native controls (date picker/select) to render dark UI correctly. */
+    color-scheme: light dark;
+
+    --accent: #0f172a;
+  }
+
+  html, body {
+    @apply bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-50;
+  }
+
+  a {
+    @apply text-slate-900 underline-offset-2 hover:underline dark:text-slate-100;
+  }
+
+  h1 {
+    @apply text-2xl font-semibold tracking-tight;
+  }
+
+  h2 {
+    @apply text-xl font-semibold tracking-tight;
+  }
+
+  h3 {
+    @apply text-lg font-semibold;
+  }
+}
+
+@layer components {
+  /* Bootstrap-ish class compatibility for Identity UI */
+  .container,
+  .container-fluid {
+    @apply mx-auto w-full max-w-4xl px-4;
+  }
+
+  .row {
+    @apply -mx-2 flex flex-wrap;
+  }
+
+  [class*="col-"],
+  .col,
+  .col-md,
+  .col-lg,
+  .col-xl {
+    @apply mx-2 w-full;
+  }
+
+  /* Avoid applying same-name utilities (circular dependency). */
+  .w-100 { @apply w-full; }
+
+  .form-floating {
+    @apply relative;
+  }
+
+  .form-control,
+  .form-select,
+  .form-check-input {
+    @apply w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm outline-none;
+    @apply focus:border-slate-400 focus:ring-4 focus:ring-slate-200;
+    @apply dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:focus:ring-slate-800;
+  }
+
+  .form-check-input {
+    @apply h-4 w-4;
+  }
+
+  .form-control[disabled],
+  .form-select[disabled] {
+    @apply bg-slate-100 text-slate-500;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center rounded-md px-3 py-2 text-sm font-semibold;
+    @apply focus:outline-none focus:ring-4 focus:ring-slate-200;
+  }
+
+  .btn-primary {
+    background-color: var(--accent);
+    color: white;
+  }
+
+  .btn-primary:hover {
+    filter: brightness(0.95);
+  }
+
+  /* Keep accent color in dark mode too (don't override to slate-100). */
+  @media (prefers-color-scheme: dark) {
+    .btn-primary {
+      border: 1px solid rgb(51 65 85); /* slate-700 */
+      color: white;
+    }
+  }
+
+  /* Native form controls used by our Tailwind-first pages */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  input[type="date"],
+  input[type="time"],
+  input[type="datetime-local"],
+  textarea,
+  select {
+    @apply rounded-md border border-slate-300 bg-white text-slate-900;
+    @apply focus:border-slate-400 focus:ring-4 focus:ring-slate-200;
+    @apply dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:focus:ring-slate-800;
+  }
+
+  /* Dropdown option list readability in dark mode */
+  @media (prefers-color-scheme: dark) {
+    select option {
+      background-color: rgb(15 23 42); /* slate-900 */
+      color: rgb(248 250 252); /* slate-50 */
+    }
+  }
+
+  .btn-danger {
+    @apply bg-red-600 text-white hover:bg-red-700;
+  }
+
+  .btn-link,
+  .nav-link {
+    @apply text-slate-700 hover:text-slate-900;
+  }
+
+  .text-danger {
+    @apply text-red-700;
+  }
+
+  .validation-message {
+    @apply mt-1 text-sm text-red-700;
+  }
+
+  .alert {
+    @apply rounded-lg border px-4 py-3 text-sm;
+  }
+
+  .alert-success {
+    @apply border-emerald-200 bg-emerald-50 text-emerald-900;
+  }
+
+  .alert-info {
+    @apply border-sky-200 bg-sky-50 text-sky-900;
+  }
+
+  .alert-warning {
+    @apply border-amber-200 bg-amber-50 text-amber-900;
+  }
+
+  .alert-danger {
+    @apply border-red-200 bg-red-50 text-red-900;
+  }
+
+  table.table {
+    @apply w-full border-separate border-spacing-0 overflow-hidden rounded-lg border border-slate-200;
+  }
+
+  table.table th {
+    @apply border-b border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs font-semibold text-slate-700;
+  }
+
+  table.table td {
+    @apply border-b border-slate-200 px-3 py-2 text-sm text-slate-700;
+  }
+}
+

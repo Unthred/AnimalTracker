@@ -1,0 +1,44 @@
+@using AnimalTracker.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@rendermode InteractiveServer
+@implements IDisposable
+
+@inject UserSettingsService Settings
+@inject AuthenticationStateProvider AuthStateProvider
+@inject AnimalTracker.State.UserPreferencesState Prefs
+
+@if (!string.IsNullOrWhiteSpace(accent))
+{
+    <style>
+        :root { --accent: @accent; }
+    </style>
+}
+
+@code
+{
+    private string? accent;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Prefs.Changed += OnPrefsChanged;
+
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        if (auth.User.Identity?.IsAuthenticated == true)
+        {
+            var s = await Settings.GetOrCreateAsync();
+            Prefs.Apply(s);
+        }
+    }
+
+    private void OnPrefsChanged()
+    {
+        accent = Prefs.AccentColorHex;
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        Prefs.Changed -= OnPrefsChanged;
+    }
+}
+

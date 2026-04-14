@@ -1,0 +1,13 @@
+@page "/settings/user"
+@rendermode InteractiveServer
+
+@inject NavigationManager Nav
+
+@code
+{
+    protected override void OnInitialized()
+    {
+        Nav.NavigateTo("/settings", replace: true);
+    }
+}
+

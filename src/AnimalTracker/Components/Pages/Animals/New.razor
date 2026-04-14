@@ -1,0 +1,106 @@
+@page "/animals/new"
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+
+@using AnimalTracker.Services
+@using AnimalTracker.Data.Entities
+@inject AnimalService Animals
+@inject SpeciesService Species
+@inject NavigationManager Nav
+
+<PageTitle>New Animal</PageTitle>
+
+<h2 class="text-lg font-semibold text-slate-900">New animal</h2>
+
+@if (!string.IsNullOrWhiteSpace(error))
+{
+    <div class="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+        @error
+    </div>
+}
+
+<EditForm Model="model" OnValidSubmit="SaveAsync" class="mt-4 space-y-4">
+    <DataAnnotationsValidator />
+
+    <div>
+        <label class="block text-sm font-medium text-slate-700" for="species">Species</label>
+        <select id="species" class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+                @bind="model.SpeciesId">
+            <option value="">Select…</option>
+            @foreach (var s in species)
+            {
+                <option value="@s.Id">@s.Name</option>
+            }
+        </select>
+        <ValidationMessage For="() => model.SpeciesId" />
+    </div>
+
+    <div>
+        <label class="block text-sm font-medium text-slate-700" for="displayName">Name (optional)</label>
+        <InputText id="displayName" class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+                   @bind-Value="model.DisplayName" />
+    </div>
+
+    <div>
+        <label class="block text-sm font-medium text-slate-700" for="features">Identifying features</label>
+        <InputTextArea id="features" class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+                       @bind-Value="model.IdentifyingFeatures" rows="4" />
+    </div>
+
+    <div>
+        <label class="block text-sm font-medium text-slate-700" for="notes">Notes</label>
+        <InputTextArea id="notes" class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+                       @bind-Value="model.Notes" rows="4" />
+    </div>
+
+    <div class="flex items-center justify-end gap-2">
+        <a class="rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100" href="/animals">Cancel</a>
+        <button type="submit" class="rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800">
+            Save
+        </button>
+    </div>
+</EditForm>
+
+@code
+{
+    private List<Species> species = [];
+    private readonly Model model = new();
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        species = await Species.GetAllAsync();
+    }
+
+    private async Task SaveAsync()
+    {
+        error = null;
+        try
+        {
+            var created = await Animals.CreateAsync(
+                speciesId: model.SpeciesId!.Value,
+                displayName: model.DisplayName,
+                identifyingFeatures: model.IdentifyingFeatures,
+                notes: model.Notes);
+
+            Nav.NavigateTo($"/animals/{created.Id}");
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private sealed class Model
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        public int? SpeciesId { get; set; }
+
+        public string? DisplayName { get; set; }
+        public string? IdentifyingFeatures { get; set; }
+        public string? Notes { get; set; }
+    }
+}
+

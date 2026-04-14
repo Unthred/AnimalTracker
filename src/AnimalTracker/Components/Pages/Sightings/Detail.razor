@@ -1,0 +1,117 @@
+@page "/sightings/{Id:int}"
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+
+@using AnimalTracker.Services
+@using AnimalTracker.Data.Entities
+@using AnimalTracker.Data
+@inject SightingService Sightings
+@inject ApplicationDbContext Db
+@inject PhotoStorageService Storage
+@inject CurrentUserService CurrentUser
+
+<PageTitle>Sighting</PageTitle>
+
+@if (loading)
+{
+    <p class="text-sm text-slate-600">Loading…</p>
+}
+else if (sighting is null)
+{
+    <p class="text-sm text-slate-700">Sighting not found.</p>
+}
+else
+{
+    <div class="flex items-start justify-between gap-4">
+        <div>
+            <h2 class="text-lg font-semibold text-slate-900">@sighting.Species.Name</h2>
+            <p class="mt-1 text-sm text-slate-600">@sighting.OccurredAtUtc.ToLocalTime().ToString("f") · @sighting.Location.Name</p>
+        </div>
+        <a class="text-sm font-medium text-slate-700 hover:text-slate-900" href="/">Back</a>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(sighting.Notes))
+    {
+        <div class="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <div class="text-sm font-semibold text-slate-900">Notes</div>
+            <div class="mt-1 text-sm text-slate-700">@sighting.Notes</div>
+        </div>
+    }
+
+    <div class="mt-6">
+        <h3 class="text-sm font-semibold text-slate-900">Photos</h3>
+        <div class="mt-3">
+            <InputFile OnChange="UploadAsync" multiple accept="image/*" />
+            @if (!string.IsNullOrWhiteSpace(uploadError))
+            {
+                <p class="mt-2 text-sm text-red-700">@uploadError</p>
+            }
+        </div>
+        @if (sighting.Photos.Count == 0)
+        {
+            <p class="mt-2 text-sm text-slate-600">No photos yet.</p>
+        }
+        else
+        {
+            <div class="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
+                @foreach (var p in sighting.Photos)
+                {
+                    <a href="@($"/photos/{p.Id}")" class="block overflow-hidden rounded-lg border border-slate-200">
+                        <img src="@($"/photos/{p.Id}")" alt="@p.OriginalFileName" class="h-32 w-full object-cover" />
+                    </a>
+                }
+            </div>
+        }
+    </div>
+}
+
+@code
+{
+    [Parameter] public int Id { get; set; }
+
+    private bool loading = true;
+    private Sighting? sighting;
+    private string? uploadError;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true;
+        sighting = await Sightings.GetAsync(Id);
+        loading = false;
+    }
+
+    private async Task UploadAsync(InputFileChangeEventArgs e)
+    {
+        uploadError = null;
+        if (sighting is null)
+            return;
+
+        try
+        {
+            foreach (var file in e.GetMultipleFiles())
+            {
+                var stored = await Storage.SaveAsync(file);
+
+                Db.SightingPhotos.Add(new SightingPhoto
+                {
+                    SightingId = sighting.Id,
+                    StoredPath = stored.StoredRelativePath,
+                    OriginalFileName = stored.OriginalFileName,
+                    ContentType = stored.ContentType,
+                    SizeBytes = stored.SizeBytes,
+                    CreatedAtUtc = DateTime.UtcNow
+                });
+            }
+
+            await Db.SaveChangesAsync();
+            sighting = await Sightings.GetAsync(Id);
+        }
+        catch (Exception ex)
+        {
+            uploadError = ex.Message;
+        }
+    }
+}
+

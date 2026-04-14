@@ -1,0 +1,17 @@
+﻿@page "/stats"
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+
+@using AnimalTracker.Services
+@inject SightingService Sightings
+
+<PageTitle>Stats</PageTitle>
+
+<h2 class="text-lg font-semibold text-slate-900">Stats</h2>
+<p class="mt-1 text-sm text-slate-600">Basic counts (MVP placeholder).</p>
+
+<div class="mt-4 rounded-lg border border-slate-200 p-4">
+    <p class="text-sm text-slate-700">Coming next: counts per species and top animals.</p>
+</div>
