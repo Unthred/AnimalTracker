@@ -65,5 +65,25 @@ public sealed class AnimalService(ApplicationDbContext db, CurrentUserService cu
         await db.SaveChangesAsync(cancellationToken);
         return entity;
     }
+
+    public async Task DeleteAsync(int id, CancellationToken cancellationToken = default)
+    {
+        var userId = await currentUser.GetRequiredUserIdAsync(cancellationToken);
+        var entity = await db.Animals.FirstOrDefaultAsync(
+            x => x.Id == id && x.OwnerUserId == userId,
+            cancellationToken);
+
+        if (entity is null)
+            throw new InvalidOperationException("Animal not found.");
+
+        await db.Sightings
+            .Where(s => s.OwnerUserId == userId && s.AnimalId == id)
+            .ExecuteUpdateAsync(
+                s => s.SetProperty(x => x.AnimalId, (int?)null).SetProperty(x => x.UpdatedAtUtc, DateTime.UtcNow),
+                cancellationToken);
+
+        db.Animals.Remove(entity);
+        await db.SaveChangesAsync(cancellationToken);
+    }
 }
 

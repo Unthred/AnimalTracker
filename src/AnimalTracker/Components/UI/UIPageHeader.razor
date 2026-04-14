@@ -1,0 +1,37 @@
+<div class="@OuterClass">
+    <div class="min-w-0 flex-1">
+        <h1 class="@TitleClass">@Title</h1>
+        @if (Description is not null)
+        {
+            <p class="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-slate-400">@Description</p>
+        }
+    </div>
+    @if (Actions is not null)
+    {
+        <div class="flex w-full min-w-0 shrink-0 flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:gap-2 [&>*]:w-full sm:[&>*]:w-auto">
+            @Actions
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public string? Description { get; set; }
+    [Parameter] public RenderFragment? Actions { get; set; }
+    [Parameter] public string? Class { get; set; }
+
+    [CascadingParameter(Name = "CompactUi")]
+    public bool CompactUi { get; set; }
+
+    private string TitleClass => CompactUi
+        ? "text-xl font-bold tracking-tight text-slate-900 dark:text-slate-50 sm:text-2xl"
+        : "text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50";
+
+    private string OuterClass => string.Join(' ', new[]
+    {
+        CompactUi
+            ? "mb-5 flex flex-col gap-4 sm:mb-6 sm:flex-row sm:items-start sm:justify-between"
+            : "mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between",
+        Class
+    }.Where(s => !string.IsNullOrWhiteSpace(s)));
+}

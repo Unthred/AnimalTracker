@@ -33,7 +33,7 @@
     private void OnPrefsChanged()
     {
         accent = Prefs.AccentColorHex;
-        InvokeAsync(StateHasChanged);
+        _ = InvokeAsync(StateHasChanged);
     }
 
     public void Dispose()

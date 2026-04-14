@@ -61,5 +61,31 @@ public sealed class LocationService(ApplicationDbContext db, CurrentUserService 
         await db.SaveChangesAsync(cancellationToken);
         return entity;
     }
+
+    public async Task DeleteAsync(int id, CancellationToken cancellationToken = default)
+    {
+        var userId = await currentUser.GetRequiredUserIdAsync(cancellationToken);
+        var owned = await db.Locations
+            .Where(x => x.OwnerUserId == userId)
+            .OrderBy(x => x.Id)
+            .ToListAsync(cancellationToken);
+
+        if (owned.Count <= 1)
+            throw new InvalidOperationException("You need at least one location.");
+
+        var remove = owned.FirstOrDefault(x => x.Id == id)
+            ?? throw new InvalidOperationException("Location not found.");
+
+        var replacement = owned.First(x => x.Id != id);
+
+        await db.Sightings
+            .Where(s => s.OwnerUserId == userId && s.LocationId == id)
+            .ExecuteUpdateAsync(
+                s => s.SetProperty(x => x.LocationId, replacement.Id).SetProperty(x => x.UpdatedAtUtc, DateTime.UtcNow),
+                cancellationToken);
+
+        db.Locations.Remove(remove);
+        await db.SaveChangesAsync(cancellationToken);
+    }
 }
 

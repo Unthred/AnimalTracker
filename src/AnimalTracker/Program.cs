@@ -45,6 +45,7 @@ builder.Services.AddIdentityCore<ApplicationUser>(options =>
 
 builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
 
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<CurrentUserService>();
 builder.Services.AddScoped<LocationService>();
 builder.Services.AddScoped<SpeciesService>();
@@ -95,6 +96,26 @@ app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
+app.MapGet("/user/background-image", [Authorize] async (
+    ApplicationDbContext db,
+    CurrentUserService currentUser,
+    PhotoStorageService storage,
+    CancellationToken cancellationToken) =>
+{
+    var userId = await currentUser.GetRequiredUserIdAsync(cancellationToken);
+    var path = await db.UserSettings.AsNoTracking()
+        .Where(x => x.OwnerUserId == userId)
+        .Select(x => x.BackgroundImageRelativePath)
+        .FirstOrDefaultAsync(cancellationToken);
+
+    if (string.IsNullOrWhiteSpace(path))
+        return Results.NotFound();
+
+    var stream = storage.OpenRead(path);
+    var contentType = PhotoStorageService.GetContentTypeForStoredPath(path);
+    return Results.File(stream, contentType, enableRangeProcessing: true);
+});
 
 app.MapGet("/photos/{id:int}", [Authorize] async (
     int id,

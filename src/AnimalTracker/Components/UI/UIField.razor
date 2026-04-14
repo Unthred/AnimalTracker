@@ -1,0 +1,23 @@
+<div class="@OuterClass">
+    @if (Label is not null)
+    {
+        <label class="block text-sm font-medium text-slate-700 dark:text-slate-200" for="@For">@Label</label>
+    }
+    <div class="@(Label is not null ? "mt-2" : "")">
+        @ChildContent
+    </div>
+    @if (Hint is not null)
+    {
+        <p class="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-400">@Hint</p>
+    }
+</div>
+
+@code {
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public string? For { get; set; }
+    [Parameter] public string? Hint { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public string? Class { get; set; }
+
+    private string OuterClass => string.Join(' ', new[] { Class }.Where(s => !string.IsNullOrWhiteSpace(s)));
+}

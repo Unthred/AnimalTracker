@@ -1,0 +1,29 @@
+<div class="@ComputedClass" role="status">
+    @ChildContent
+</div>
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public UiAlertVariant Variant { get; set; } = UiAlertVariant.Neutral;
+    [Parameter] public string? Class { get; set; }
+
+    private string ComputedClass => string.Join(' ', new[]
+    {
+        "rounded-xl border px-4 py-3 text-sm leading-relaxed",
+        Variant switch
+        {
+            UiAlertVariant.Neutral =>
+                "border-slate-200/90 bg-slate-50 text-slate-800 dark:border-slate-800 dark:bg-slate-950/80 dark:text-slate-100",
+            UiAlertVariant.Info =>
+                "border-sky-200/90 bg-sky-50 text-sky-950 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-100",
+            UiAlertVariant.Success =>
+                "border-emerald-200/90 bg-emerald-50 text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100",
+            UiAlertVariant.Warning =>
+                "border-amber-200/90 bg-amber-50 text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100",
+            UiAlertVariant.Danger =>
+                "border-red-200/90 bg-red-50 text-red-950 dark:border-red-900 dark:bg-red-950/40 dark:text-red-100",
+            _ => ""
+        },
+        Class
+    }.Where(s => !string.IsNullOrWhiteSpace(s)));
+}

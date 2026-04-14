@@ -12,59 +12,48 @@
 
 <PageTitle>New Animal</PageTitle>
 
-<h2 class="text-lg font-semibold text-slate-900">New animal</h2>
+<UIPageHeader Title="New animal" Description="Create a record for an individual you can link to sightings." />
 
 @if (!string.IsNullOrWhiteSpace(error))
 {
-    <div class="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-900">
-        @error
-    </div>
+    <UIAlert Variant="UiAlertVariant.Danger" Class="mb-8">@error</UIAlert>
 }
 
-<EditForm Model="model" OnValidSubmit="SaveAsync" class="mt-4 space-y-4">
-    <DataAnnotationsValidator />
+<UICard>
+    <EditForm Model="model" OnValidSubmit="SaveAsync" class="space-y-6">
+        <DataAnnotationsValidator />
 
-    <div>
-        <label class="block text-sm font-medium text-slate-700" for="species">Species</label>
-        <select id="species" class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
-                @bind="model.SpeciesId">
-            <option value="">Select…</option>
-            @foreach (var s in species)
-            {
-                <option value="@s.Id">@s.Name</option>
-            }
-        </select>
-        <ValidationMessage For="() => model.SpeciesId" />
-    </div>
+        <UIField Label="Species" For="species">
+            <select id="species" class="w-full px-3 py-2.5" @bind="model.SpeciesId">
+                <option value="">Select…</option>
+                @foreach (var s in species)
+                {
+                    <option value="@s.Id">@s.Name</option>
+                }
+            </select>
+            <ValidationMessage For="() => model.SpeciesId" />
+        </UIField>
 
-    <div>
-        <label class="block text-sm font-medium text-slate-700" for="displayName">Name (optional)</label>
-        <InputText id="displayName" class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
-                   @bind-Value="model.DisplayName" />
-    </div>
+        <UIField Label="Name (optional)" For="displayName">
+            <InputText id="displayName" class="w-full px-3 py-2.5" @bind-Value="model.DisplayName" />
+        </UIField>
 
-    <div>
-        <label class="block text-sm font-medium text-slate-700" for="features">Identifying features</label>
-        <InputTextArea id="features" class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
-                       @bind-Value="model.IdentifyingFeatures" rows="4" />
-    </div>
+        <UIField Label="Identifying features" For="features">
+            <InputTextArea id="features" class="w-full px-3 py-2.5" @bind-Value="model.IdentifyingFeatures" rows="4" />
+        </UIField>
 
-    <div>
-        <label class="block text-sm font-medium text-slate-700" for="notes">Notes</label>
-        <InputTextArea id="notes" class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
-                       @bind-Value="model.Notes" rows="4" />
-    </div>
+        <UIField Label="Notes" For="notes">
+            <InputTextArea id="notes" class="w-full px-3 py-2.5" @bind-Value="model.Notes" rows="4" />
+        </UIField>
 
-    <div class="flex items-center justify-end gap-2">
-        <a class="rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100" href="/animals">Cancel</a>
-        <button type="submit" class="rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800">
-            Save
-        </button>
-    </div>
-</EditForm>
+        <div class="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:flex-wrap sm:justify-end sm:gap-3">
+            <UIButton Href="/animals" Variant="UiButtonVariant.Outline" Class="w-full sm:w-auto">Cancel</UIButton>
+            <UIButton Type="submit" Variant="UiButtonVariant.Primary" Class="w-full sm:w-auto">Save animal</UIButton>
+        </div>
+    </EditForm>
+</UICard>
 
-@code
-{
+@code {
     private List<Species> species = [];
     private readonly Model model = new();
     private string? error;
@@ -103,4 +92,3 @@
         public string? Notes { get; set; }
     }
 }
-

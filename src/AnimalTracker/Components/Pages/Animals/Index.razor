@@ -1,5 +1,6 @@
 @page "/animals"
 @rendermode InteractiveServer
+@implements IDisposable
 
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize]
@@ -8,81 +9,83 @@
 @using AnimalTracker.Data.Entities
 @inject AnimalService Animals
 @inject SpeciesService Species
+@inject AnimalTracker.State.UserPreferencesState Prefs
 
 <PageTitle>Animals</PageTitle>
 
-<div class="flex items-center justify-between gap-3">
-    <div>
-        <h2 class="text-lg font-semibold text-slate-900">Animals</h2>
-        <p class="text-sm text-slate-600">Identified individuals you track.</p>
-    </div>
-    <a class="inline-flex items-center rounded-md bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800"
-       href="animals/new">
-        New animal
-    </a>
-</div>
+<UIPageHeader Title="Animals" Description="Identified individuals you track.">
+    <Actions>
+        <UIButton Href="animals/new" Variant="UiButtonVariant.Primary">New animal</UIButton>
+    </Actions>
+</UIPageHeader>
 
-<div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
-    <div class="md:col-span-2">
-        <label class="block text-sm font-medium text-slate-700" for="q">Search</label>
-        <input id="q" class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
-               @bind="query" @bind:event="oninput" />
+<UICard Class="mt-2">
+    <div class="grid min-w-0 grid-cols-1 gap-6 md:grid-cols-3 md:gap-8">
+        <UIField Label="Search" For="q" Class="md:col-span-2">
+            <input id="q" type="search" class="w-full min-w-0 px-3 py-2.5" @bind="query" @bind:event="oninput" />
+        </UIField>
+        <UIField Label="Species" For="species">
+            <select id="species" class="w-full min-w-0 px-3 py-2.5" @bind="speciesId">
+                <option value="">All</option>
+                @foreach (var s in species)
+                {
+                    <option value="@s.Id">@s.Name</option>
+                }
+            </select>
+        </UIField>
     </div>
-    <div>
-        <label class="block text-sm font-medium text-slate-700" for="species">Species</label>
-        <select id="species" class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
-                @bind="speciesId">
-            <option value="">All</option>
-            @foreach (var s in species)
-            {
-                <option value="@s.Id">@s.Name</option>
-            }
-        </select>
+    <div class="mt-6 flex justify-stretch sm:justify-start">
+        <UIButton Variant="UiButtonVariant.Outline" Class="w-full sm:w-auto" @onclick="ReloadAsync">Apply filters</UIButton>
     </div>
-</div>
+</UICard>
 
-<div class="mt-4">
-    <button class="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            @onclick="ReloadAsync">
-        Apply
-    </button>
-</div>
-
-<div class="mt-6">
+<div class="mt-6 sm:mt-8">
     @if (loading)
     {
-        <p class="text-sm text-slate-600">Loading…</p>
+        <p class="text-sm text-slate-600 dark:text-slate-400">Loading…</p>
     }
     else if (animals.Count == 0)
     {
-        <p class="text-sm text-slate-700">No animals yet.</p>
+        <UICard>
+            <p class="text-sm leading-relaxed text-slate-700 dark:text-slate-200">No animals match your filters.</p>
+        </UICard>
     }
     else
     {
-        <ul class="divide-y divide-slate-200 rounded-lg border border-slate-200">
-            @foreach (var a in animals)
-            {
-                <li class="p-4 hover:bg-slate-50">
-                    <a class="block" href="@($"/animals/{a.Id}")">
-                        <div class="text-sm font-semibold text-slate-900">
-                            @(!string.IsNullOrWhiteSpace(a.DisplayName) ? a.DisplayName : $"Animal #{a.Id}")
-                        </div>
-                        <div class="mt-1 text-sm text-slate-600">@a.Species.Name</div>
-                    </a>
-                </li>
-            }
-        </ul>
+        <UICard Title="Results" BodyPadding="false">
+            <ul class="divide-y divide-slate-200/80 dark:divide-slate-800/80">
+                @foreach (var a in animals)
+                {
+                    <li class="transition duration-200 ease-in-out hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
+                        <a class="block no-underline @(Prefs.CompactMode ? "px-4 py-3" : "px-4 py-4 sm:px-6 sm:py-5")" href="@($"/animals/{a.Id}")">
+                            <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                                @(!string.IsNullOrWhiteSpace(a.DisplayName) ? a.DisplayName : $"Animal #{a.Id}")
+                            </div>
+                            <div class="mt-1 text-sm text-slate-600 dark:text-slate-300">@a.Species.Name</div>
+                        </a>
+                    </li>
+                }
+            </ul>
+        </UICard>
     }
 </div>
 
-@code
-{
+@code {
     private bool loading = true;
     private List<Species> species = [];
     private List<Animal> animals = [];
 
     private string? query;
     private int? speciesId;
+
+    protected override void OnInitialized() =>
+        Prefs.Changed += OnPrefsChanged;
+
+    public void Dispose() =>
+        Prefs.Changed -= OnPrefsChanged;
+
+    private void OnPrefsChanged() =>
+        _ = InvokeAsync(StateHasChanged);
 
     protected override async Task OnInitializedAsync()
     {
@@ -97,4 +100,3 @@
         loading = false;
     }
 }
-

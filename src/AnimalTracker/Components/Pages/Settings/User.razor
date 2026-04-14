@@ -5,128 +5,202 @@
 @attribute [Authorize]
 
 @using AnimalTracker.Services
+@using Microsoft.AspNetCore.Components.Forms
 @inject UserSettingsService Settings
 @inject AnimalTracker.State.UserPreferencesState Prefs
 
-<PageTitle>User settings</PageTitle>
+<PageTitle>Settings</PageTitle>
 
-<h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">Settings</h2>
-<p class="mt-1 text-sm text-slate-600 dark:text-slate-300">Locations and user preferences.</p>
-
-<div class="mt-6">
-    <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-50">User preferences</h3>
-    <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">Customize how the app looks and behaves for your account.</p>
-</div>
+<UIPageHeader Title="Settings" Description="Locations, species catalog, and preferences for your account." />
 
 @if (!string.IsNullOrWhiteSpace(message))
 {
-    <div class="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-800 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100">
+    <UIAlert Variant="@(message.StartsWith("Error", StringComparison.OrdinalIgnoreCase) ? UiAlertVariant.Danger : UiAlertVariant.Success)" Class="mb-8">
         @message
-    </div>
+    </UIAlert>
 }
 
-<EditForm Model="model" OnValidSubmit="SaveAsync" class="mt-6 space-y-6">
-    <DataAnnotationsValidator />
-
-    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div>
-            <label class="block text-sm font-medium text-slate-700 dark:text-slate-200" for="accent">Highlight color</label>
-            <div class="mt-1 flex items-center gap-3">
-                <input id="accent" type="color" class="h-10 w-14 cursor-pointer rounded border border-slate-300 bg-white p-1 dark:border-slate-700 dark:bg-slate-900"
-                       @bind="model.AccentColorHex" />
-                <input type="text" class="w-32 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
-                       @bind="model.AccentColorHex" />
-            </div>
-            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Hex format like #22c55e</p>
-        </div>
-
-        <div>
-            <label class="block text-sm font-medium text-slate-700 dark:text-slate-200" for="pageSize">Timeline page size</label>
-            <select id="pageSize" class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
-                    @bind="model.TimelinePageSize">
-                <option value="25">25</option>
-                <option value="50">50</option>
-                <option value="100">100</option>
-            </select>
-        </div>
-    </div>
-
-    <div>
-        <label class="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-            <InputCheckbox class="h-4 w-4 rounded border-slate-300 dark:border-slate-700" @bind-Value="model.CompactMode" />
-            Compact mode (tighter spacing)
-        </label>
-    </div>
-
-    <div class="flex items-center justify-end gap-2">
-        <button type="submit" class="btn btn-primary">
-            Save
-        </button>
-    </div>
-</EditForm>
-
-<div class="mt-10">
-    <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-50">Locations</h3>
-    <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">Where sightings occur.</p>
-</div>
-
-<div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-    <div>
-        <label class="block text-sm font-medium text-slate-700 dark:text-slate-200" for="name">New location name</label>
-        <input id="name" class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
-               @bind="newLocationName" />
-    </div>
-    <div class="flex items-end">
-        <button class="btn btn-primary" @onclick="CreateLocationAsync">
-            Add
-        </button>
-    </div>
-</div>
-
-<div class="mt-6">
-    @if (locationsLoading)
-    {
-        <p class="text-sm text-slate-600 dark:text-slate-300">Loading…</p>
-    }
-    else if (locations.Count == 0)
-    {
-        <p class="text-sm text-slate-700 dark:text-slate-200">No locations yet.</p>
-    }
-    else
-    {
-        <ul class="divide-y divide-slate-200 rounded-lg border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
-            @foreach (var l in locations)
-            {
-                <li class="p-4">
-                    <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">@l.Name</div>
-                    @if (!string.IsNullOrWhiteSpace(l.Notes))
-                    {
-                        <div class="mt-1 text-sm text-slate-600 dark:text-slate-300">@l.Notes</div>
-                    }
-                </li>
-            }
-        </ul>
-    }
-</div>
-
-@code
+@if (!string.IsNullOrWhiteSpace(bgMessage))
 {
+    <UIAlert Variant="@(bgMessage.StartsWith("Error", StringComparison.OrdinalIgnoreCase) ? UiAlertVariant.Danger : UiAlertVariant.Success)" Class="mb-8">
+        @bgMessage
+    </UIAlert>
+}
+
+<UICard Title="User preferences">
+    <EditForm Model="model" OnValidSubmit="SaveAsync" class="space-y-8">
+        <DataAnnotationsValidator />
+
+        <div class="grid min-w-0 grid-cols-1 gap-8 md:grid-cols-2">
+            <UIField Label="Highlight color" For="accent" Hint="Hex format like #22c55e">
+                <div class="flex min-w-0 flex-wrap items-center gap-3 sm:gap-4">
+                    <input id="accent" type="color" class="h-11 w-16 shrink-0 cursor-pointer rounded-xl border border-slate-200/90 bg-white p-1 shadow-sm dark:border-slate-700 dark:bg-slate-900"
+                           @bind="model.AccentColorHex" />
+                    <input type="text" class="min-w-0 flex-1 px-3 py-2.5" @bind="model.AccentColorHex" />
+                </div>
+            </UIField>
+
+            <UIField Label="Timeline page size" For="pageSize">
+                <select id="pageSize" class="w-full min-w-0 px-3 py-2.5" @bind="model.TimelinePageSize">
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+            </UIField>
+        </div>
+
+        <UIField Label="Compact layout" For="compact"
+                 Hint="After you save: less padding in the main column and inside cards, slightly smaller page titles, and denser rows on Timeline and Animals. Visit Timeline before and after saving to see the clearest difference.">
+            <label for="compact"
+                   class="flex min-h-[2.75rem] w-full max-w-xl cursor-pointer items-center gap-3 rounded-xl border border-slate-200/90 bg-white px-4 py-2.5 shadow-sm transition duration-200 ease-in-out hover:border-slate-300/90 dark:border-slate-700 dark:bg-slate-950/40 dark:hover:border-slate-600">
+                <InputCheckbox id="compact" class="checkbox-soft size-[1.125rem] shrink-0" @bind-Value="model.CompactMode" />
+                <span class="select-none text-sm font-medium text-slate-800 dark:text-slate-100">Tighter spacing across the app</span>
+            </label>
+        </UIField>
+
+        <div class="flex justify-stretch border-t border-slate-200/80 pt-6 dark:border-slate-800/80 sm:justify-end">
+            <UIButton Type="submit" Variant="UiButtonVariant.Primary" Class="w-full sm:w-auto">Save preferences</UIButton>
+        </div>
+    </EditForm>
+</UICard>
+
+<UICard Title="Background image" Class="mt-8">
+    <p class="text-sm leading-relaxed text-slate-600 dark:text-slate-300">Optional wallpaper behind the app (JPEG, PNG, GIF, or WebP, max 5 MB). A light scrim keeps text readable.</p>
+    <div class="mt-4 flex min-w-0 flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center">
+        <InputFile OnChange="UploadBackgroundAsync" accept="image/jpeg,image/png,image/gif,image/webp,.jpg,.jpeg,.png,.gif,.webp"
+                   class="block w-full min-w-0 cursor-pointer rounded-xl border border-dashed border-slate-200/90 bg-slate-50/50 px-4 py-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-950/50 dark:text-slate-300" />
+        @if (hasBackground)
+        {
+            <UIButton Variant="UiButtonVariant.Outline" @onclick="ClearBackgroundAsync">Remove background</UIButton>
+        }
+    </div>
+    @if (hasBackground)
+    {
+        <div class="mt-4 overflow-hidden rounded-xl border border-slate-200/80 dark:border-slate-800/80">
+            <img src="@($"/user/background-image?t={Prefs.UiStamp}")" alt="Current background preview" class="h-32 w-full object-cover" />
+        </div>
+    }
+</UICard>
+
+<UICard Title="Locations" Class="mt-8">
+    <p class="text-sm leading-relaxed text-slate-600 dark:text-slate-300">Where sightings occur. You must keep at least one location; sightings using a removed location are moved to another of yours.</p>
+
+    <div class="mt-6 flex flex-col gap-6 md:flex-row md:items-end">
+        <UIField Label="New location name" For="name" Class="min-w-0 flex-1">
+            <input id="name" type="text" class="w-full px-3 py-2.5" @bind="newLocationName" />
+        </UIField>
+        <UIButton Variant="UiButtonVariant.Primary" Class="shrink-0" @onclick="CreateLocationAsync">Add location</UIButton>
+    </div>
+
+    <div class="mt-8">
+        @if (locationsLoading)
+        {
+            <p class="text-sm text-slate-600 dark:text-slate-400">Loading…</p>
+        }
+        else if (locations.Count == 0)
+        {
+            <p class="text-sm text-slate-700 dark:text-slate-200">No locations yet.</p>
+        }
+        else
+        {
+            <ul class="divide-y divide-slate-200/80 overflow-hidden rounded-xl border border-slate-200/80 dark:divide-slate-800/80 dark:border-slate-800/80">
+                @foreach (var l in locations)
+                {
+                    <li class="flex flex-col gap-3 bg-slate-50/30 px-4 py-4 transition duration-200 hover:bg-slate-50/80 dark:bg-transparent dark:hover:bg-slate-800/40 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="min-w-0">
+                            <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">@l.Name</div>
+                            @if (!string.IsNullOrWhiteSpace(l.Notes))
+                            {
+                                <div class="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-300">@l.Notes</div>
+                            }
+                        </div>
+                        @if (locations.Count > 1)
+                        {
+                            <UIButton Variant="UiButtonVariant.Danger" Size="UiButtonSize.Sm" Class="w-full shrink-0 sm:w-auto" @onclick="() => DeleteLocationAsync(l.Id)">Delete</UIButton>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+    </div>
+</UICard>
+
+<UICard Title="Species catalog" Class="mt-8">
+    <p class="text-sm leading-relaxed text-slate-600 dark:text-slate-300">Species are shared app-wide. You can remove one only when no animals or sightings reference it.</p>
+
+    <div class="mt-6 grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
+        <UIField Label="New species name" For="newSpecies">
+            <input id="newSpecies" type="text" class="w-full px-3 py-2.5" @bind="newSpeciesName" />
+        </UIField>
+        <UIButton Variant="UiButtonVariant.Primary" Class="w-full shrink-0 sm:w-auto" @onclick="CreateSpeciesAsync">Add species</UIButton>
+    </div>
+
+    <div class="mt-8">
+        @if (speciesLoading)
+        {
+            <p class="text-sm text-slate-600 dark:text-slate-400">Loading…</p>
+        }
+        else if (speciesRows.Count == 0)
+        {
+            <p class="text-sm text-slate-700 dark:text-slate-200">No species.</p>
+        }
+        else
+        {
+            <ul class="divide-y divide-slate-200/80 overflow-hidden rounded-xl border border-slate-200/80 dark:divide-slate-800/80 dark:border-slate-800/80">
+                @foreach (var row in speciesRows)
+                {
+                    var canDelete = row.AnimalCount == 0 && row.SightingCount == 0;
+                    <li class="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="min-w-0">
+                            <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">@row.Name</div>
+                            <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">Animals: @row.AnimalCount · Sightings: @row.SightingCount</div>
+                        </div>
+                        <UIButton Variant="UiButtonVariant.Danger" Size="UiButtonSize.Sm" Disabled="@(!canDelete)" Class="w-full shrink-0 sm:w-auto"
+                                  title="@(canDelete ? "" : "Still in use by animals or sightings.")"
+                                  @onclick="() => DeleteSpeciesAsync(row.Id)">Delete</UIButton>
+                    </li>
+                }
+            </ul>
+        }
+    </div>
+</UICard>
+
+@code {
     private string? message;
+    private string? bgMessage;
     private readonly Model model = new();
 
     [Inject] private LocationService LocationService { get; set; } = default!;
+    [Inject] private SpeciesService SpeciesService { get; set; } = default!;
 
     private bool locationsLoading = true;
+    private bool speciesLoading = true;
     private List<AnimalTracker.Data.Entities.Location> locations = [];
+    private List<SpeciesUsageRow> speciesRows = [];
     private string newLocationName = "";
+    private string newSpeciesName = "";
+
+    private bool hasBackground;
 
     protected override async Task OnInitializedAsync()
+    {
+        await ReloadSettingsModelAsync();
+        await ReloadLocationsAsync();
+        await ReloadSpeciesAsync();
+    }
+
+    private async Task ReloadSettingsModelAsync()
     {
         var s = await Settings.GetOrCreateAsync();
         model.AccentColorHex = s.AccentColorHex;
         model.CompactMode = s.CompactMode;
         model.TimelinePageSize = s.TimelinePageSize;
+        hasBackground = !string.IsNullOrWhiteSpace(s.BackgroundImageRelativePath);
+    }
 
+    private async Task ReloadLocationsAsync()
+    {
+        locationsLoading = true;
         locations = await LocationService.GetAllAsync();
         if (locations.Count == 0)
         {
@@ -134,6 +208,13 @@
             locations = await LocationService.GetAllAsync();
         }
         locationsLoading = false;
+    }
+
+    private async Task ReloadSpeciesAsync()
+    {
+        speciesLoading = true;
+        speciesRows = await SpeciesService.ListWithUsageAsync();
+        speciesLoading = false;
     }
 
     private async Task SaveAsync()
@@ -146,11 +227,48 @@
             model.CompactMode = saved.CompactMode;
             model.TimelinePageSize = saved.TimelinePageSize;
             Prefs.Apply(saved);
+            hasBackground = !string.IsNullOrWhiteSpace(saved.BackgroundImageRelativePath);
             message = "Saved.";
         }
         catch (Exception ex)
         {
             message = $"Error: {ex.Message}";
+        }
+    }
+
+    private async Task UploadBackgroundAsync(InputFileChangeEventArgs e)
+    {
+        bgMessage = null;
+        try
+        {
+            var file = e.File;
+            if (file is null)
+                return;
+
+            var saved = await Settings.SetBackgroundImageAsync(file);
+            Prefs.Apply(saved);
+            hasBackground = true;
+            bgMessage = "Background image updated.";
+        }
+        catch (Exception ex)
+        {
+            bgMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    private async Task ClearBackgroundAsync()
+    {
+        bgMessage = null;
+        try
+        {
+            var saved = await Settings.ClearBackgroundImageAsync();
+            Prefs.Apply(saved);
+            hasBackground = false;
+            bgMessage = "Background removed.";
+        }
+        catch (Exception ex)
+        {
+            bgMessage = $"Error: {ex.Message}";
         }
     }
 
@@ -161,7 +279,56 @@
 
         await LocationService.CreateAsync(newLocationName, notes: null);
         newLocationName = "";
-        locations = await LocationService.GetAllAsync();
+        await ReloadLocationsAsync();
+    }
+
+    private async Task DeleteLocationAsync(int id)
+    {
+        message = null;
+        try
+        {
+            await LocationService.DeleteAsync(id);
+            await ReloadLocationsAsync();
+            message = "Location deleted. Any sightings that used it were moved to another location.";
+        }
+        catch (Exception ex)
+        {
+            message = $"Error: {ex.Message}";
+        }
+    }
+
+    private async Task CreateSpeciesAsync()
+    {
+        message = null;
+        try
+        {
+            if (string.IsNullOrWhiteSpace(newSpeciesName))
+                return;
+
+            await SpeciesService.CreateAsync(newSpeciesName, description: null);
+            newSpeciesName = "";
+            await ReloadSpeciesAsync();
+            message = "Species added.";
+        }
+        catch (Exception ex)
+        {
+            message = $"Error: {ex.Message}";
+        }
+    }
+
+    private async Task DeleteSpeciesAsync(int id)
+    {
+        message = null;
+        try
+        {
+            await SpeciesService.DeleteAsync(id);
+            await ReloadSpeciesAsync();
+            message = "Species deleted.";
+        }
+        catch (Exception ex)
+        {
+            message = $"Error: {ex.Message}";
+        }
     }
 
     private sealed class Model
@@ -174,4 +341,3 @@
         public int TimelinePageSize { get; set; } = 50;
     }
 }
-

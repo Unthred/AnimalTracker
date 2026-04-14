@@ -22,6 +22,12 @@ public sealed class UserSettings
     /// </summary>
     public int TimelinePageSize { get; set; } = 50;
 
+    /// <summary>
+    /// Optional full-page background image stored under App_Data (relative to content root).
+    /// </summary>
+    [MaxLength(512)]
+    public string? BackgroundImageRelativePath { get; set; }
+
     public DateTime CreatedAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
 }

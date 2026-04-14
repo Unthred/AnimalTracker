@@ -1,0 +1,45 @@
+@if (Href is not null)
+{
+    <a href="@Href" class="@ComputedClass" @attributes="AdditionalAttributes">@ChildContent</a>
+}
+else
+{
+    <button type="@Type" class="@ComputedClass" disabled="@Disabled" @onclick="OnClick" @attributes="AdditionalAttributes">@ChildContent</button>
+}
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public string? Href { get; set; }
+    [Parameter] public string Type { get; set; } = "button";
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public UiButtonVariant Variant { get; set; } = UiButtonVariant.Primary;
+    [Parameter] public UiButtonSize Size { get; set; } = UiButtonSize.Md;
+    [Parameter] public EventCallback<MouseEventArgs> OnClick { get; set; }
+    [Parameter] public string? Class { get; set; }
+
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    private string ComputedClass => string.Join(' ', new[]
+    {
+        "inline-flex items-center justify-center gap-2 font-semibold transition duration-200 ease-in-out",
+        "focus:outline-none focus-visible:ring-4 focus-visible:ring-slate-200/80 dark:focus-visible:ring-slate-700/80",
+        Size == UiButtonSize.Sm ? "rounded-lg px-3 py-1.5 text-xs" : "rounded-xl px-4 py-2.5 text-sm",
+        Variant switch
+        {
+            UiButtonVariant.Primary =>
+                "bg-[var(--accent)] text-white shadow-sm hover:brightness-[0.96] active:brightness-[0.92]",
+            UiButtonVariant.Secondary =>
+                "bg-slate-100 text-slate-900 shadow-sm hover:bg-slate-200/90 dark:bg-slate-800 dark:text-slate-50 dark:hover:bg-slate-700",
+            UiButtonVariant.Outline =>
+                "border border-slate-200/90 bg-white text-slate-800 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-100 dark:hover:bg-slate-800/80",
+            UiButtonVariant.Ghost =>
+                "text-slate-700 hover:bg-slate-100/90 dark:text-slate-200 dark:hover:bg-slate-800/60",
+            UiButtonVariant.Danger =>
+                "bg-red-600 text-white shadow-sm hover:bg-red-700 active:bg-red-800",
+            _ => ""
+        },
+        Disabled ? "pointer-events-none opacity-50" : "",
+        Class
+    }.Where(s => !string.IsNullOrWhiteSpace(s)));
+}

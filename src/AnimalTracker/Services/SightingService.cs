@@ -12,7 +12,7 @@ public sealed record SightingFilters(
     int? AnimalId,
     bool UnknownOnly);
 
-public sealed class SightingService(ApplicationDbContext db, CurrentUserService currentUser, LocationService locations)
+public sealed class SightingService(ApplicationDbContext db, CurrentUserService currentUser, LocationService locations, PhotoStorageService photos)
 {
     public async Task<List<Sighting>> GetRecentAsync(int take, SightingFilters filters, CancellationToken cancellationToken = default)
     {
@@ -103,6 +103,23 @@ public sealed class SightingService(ApplicationDbContext db, CurrentUserService 
 
         entity.AnimalId = animalId;
         entity.UpdatedAtUtc = DateTime.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task DeleteAsync(int id, CancellationToken cancellationToken = default)
+    {
+        var userId = await currentUser.GetRequiredUserIdAsync(cancellationToken);
+        var entity = await db.Sightings
+            .Include(x => x.Photos)
+            .FirstOrDefaultAsync(x => x.Id == id && x.OwnerUserId == userId, cancellationToken);
+
+        if (entity is null)
+            throw new InvalidOperationException("Sighting not found.");
+
+        foreach (var p in entity.Photos)
+            photos.TryDeleteStoredFile(p.StoredPath);
+
+        db.Sightings.Remove(entity);
         await db.SaveChangesAsync(cancellationToken);
     }
 }

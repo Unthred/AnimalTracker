@@ -1,5 +1,6 @@
 ﻿@page "/"
 @rendermode InteractiveServer
+@implements IDisposable
 
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize]
@@ -13,104 +14,107 @@
 
 <PageTitle>Timeline</PageTitle>
 
-<div class="flex items-center justify-between gap-3">
-    <div>
-        <h2 class="text-lg font-semibold text-slate-900">Timeline</h2>
-        <p class="text-sm text-slate-600">Recent sightings (newest first).</p>
+<UIPageHeader Title="Timeline" Description="Recent sightings, newest first.">
+    <Actions>
+        <UIButton Href="sightings/new" Variant="UiButtonVariant.Primary">Add sighting</UIButton>
+    </Actions>
+</UIPageHeader>
+
+<UICard Class="mt-2">
+    <div class="min-w-0 space-y-6">
+        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8 lg:grid-cols-2">
+            <UIField Label="Species" For="species">
+                <select id="species" class="w-full min-w-0 px-3 py-2.5" @bind="selectedSpeciesId">
+                    <option value="">All</option>
+                    @foreach (var s in species)
+                    {
+                        <option value="@s.Id">@s.Name</option>
+                    }
+                </select>
+            </UIField>
+
+            <UIField Label="Location" For="location">
+                <select id="location" class="w-full min-w-0 px-3 py-2.5" @bind="selectedLocationId">
+                    <option value="">All</option>
+                    @foreach (var l in locations)
+                    {
+                        <option value="@l.Id">@l.Name</option>
+                    }
+                </select>
+            </UIField>
+        </div>
+
+        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:items-end sm:gap-8">
+            <div class="flex flex-col justify-end">
+                <label for="unknownOnly" class="inline-flex cursor-pointer items-center gap-3 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    <input id="unknownOnly" type="checkbox"
+                           class="checkbox-soft size-[1.125rem] shrink-0"
+                           @bind="unknownOnly" />
+                    Unknown only
+                </label>
+                <p class="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-400">Only sightings without a linked animal.</p>
+            </div>
+
+            <div class="flex sm:justify-end">
+                <UIButton Variant="UiButtonVariant.Outline" Class="w-full sm:w-auto" @onclick="ReloadAsync">Apply filters</UIButton>
+            </div>
+        </div>
     </div>
+</UICard>
 
-    <a class="btn btn-primary"
-       href="sightings/new">
-        Add sighting
-    </a>
-</div>
-
-<div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
-    <div>
-        <label class="block text-sm font-medium text-slate-700" for="species">Species</label>
-        <select id="species" class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
-                @bind="selectedSpeciesId">
-            <option value="">All</option>
-            @foreach (var s in species)
-            {
-                <option value="@s.Id">@s.Name</option>
-            }
-        </select>
-    </div>
-
-    <div>
-        <label class="block text-sm font-medium text-slate-700" for="location">Location</label>
-        <select id="location" class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
-                @bind="selectedLocationId">
-            <option value="">All</option>
-            @foreach (var l in locations)
-            {
-                <option value="@l.Id">@l.Name</option>
-            }
-        </select>
-    </div>
-
-    <div class="flex items-end gap-3">
-        <label class="inline-flex items-center gap-2 text-sm text-slate-700">
-            <input type="checkbox" class="h-4 w-4 rounded border-slate-300" @bind="unknownOnly" />
-            Unknown only
-        </label>
-        <button class="ml-auto inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
-                @onclick="ReloadAsync">
-            Apply
-        </button>
-    </div>
-</div>
-
-<div class="mt-6">
+<div class="mt-6 sm:mt-8">
     @if (loading)
     {
-        <p class="text-sm text-slate-600">Loading…</p>
+        <p class="text-sm text-slate-600 dark:text-slate-400">Loading…</p>
     }
     else if (sightings.Count == 0)
     {
-        <div class="rounded-lg border border-slate-200 bg-slate-50 p-4">
-            <p class="text-sm text-slate-700">No sightings yet.</p>
-            <p class="mt-1 text-sm text-slate-600">Add your first sighting to start tracking.</p>
-        </div>
+        <UICard>
+            <p class="font-medium text-slate-900 dark:text-slate-50">No sightings yet.</p>
+            <p class="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">Add your first sighting to start tracking.</p>
+            <div class="mt-6">
+                <UIButton Href="sightings/new" Variant="UiButtonVariant.Primary">Add sighting</UIButton>
+            </div>
+        </UICard>
     }
     else
     {
-        <ul class="divide-y divide-slate-200 rounded-lg border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
-            @foreach (var s in sightings)
-            {
-                <li class="hover:bg-slate-50 dark:hover:bg-slate-800/50 @(Prefs.CompactMode ? "p-2" : "p-4")">
-                    <div class="flex items-start justify-between gap-4">
-                        <div>
-                            <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                                @s.Species.Name
-                                @if (s.Animal is not null && !string.IsNullOrWhiteSpace(s.Animal.DisplayName))
+        <UICard Title="Sightings" BodyPadding="false">
+            <ul class="divide-y divide-slate-200/80 dark:divide-slate-800/80">
+                @foreach (var s in sightings)
+                {
+                    <li class="transition duration-200 ease-in-out hover:bg-slate-50/80 dark:hover:bg-slate-800/40 @(Prefs.CompactMode ? "px-4 py-3" : "px-4 py-4 sm:px-6 sm:py-5")">
+                        <div class="flex flex-col gap-3 min-[400px]:flex-row min-[400px]:items-start min-[400px]:justify-between min-[400px]:gap-4">
+                            <div class="min-w-0 flex-1">
+                                <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                                    @s.Species.Name
+                                    @if (s.Animal is not null && !string.IsNullOrWhiteSpace(s.Animal.DisplayName))
+                                    {
+                                        <span class="font-normal text-slate-600 dark:text-slate-300">(@s.Animal.DisplayName)</span>
+                                    }
+                                </div>
+                                <div class="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                                    @s.OccurredAtUtc.ToLocalTime().ToString("g") · @s.Location.Name
+                                </div>
+                                @if (!string.IsNullOrWhiteSpace(s.Notes))
                                 {
-                                    <span class="text-slate-600 dark:text-slate-300">(@s.Animal.DisplayName)</span>
+                                    <div class="mt-2 text-sm leading-relaxed text-slate-700 dark:text-slate-200">@s.Notes</div>
                                 }
                             </div>
-                            <div class="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                                @s.OccurredAtUtc.ToLocalTime().ToString("g") · @s.Location.Name
-                            </div>
-                            @if (!string.IsNullOrWhiteSpace(s.Notes))
-                            {
-                                <div class="mt-2 text-sm text-slate-700 dark:text-slate-200">@s.Notes</div>
-                            }
-                        </div>
 
-                        <a class="text-sm font-medium text-slate-700 hover:text-slate-900 dark:text-slate-200 dark:hover:text-slate-50"
-                           href="@($"sightings/{s.Id}")">
-                            Details
-                        </a>
-                    </div>
-                </li>
-            }
-        </ul>
+                            <UIButton Href="@($"sightings/{s.Id}")" Variant="UiButtonVariant.Outline" Size="UiButtonSize.Sm"
+                                      Class="w-full shrink-0 min-[400px]:w-auto">
+                                Details
+                            </UIButton>
+                        </div>
+                    </li>
+                }
+            </ul>
+        </UICard>
     }
 </div>
 
-@code
-{
+@code {
     private bool loading = true;
     private List<Species> species = [];
     private List<Location> locations = [];
@@ -119,6 +123,15 @@
     private int? selectedSpeciesId;
     private int? selectedLocationId;
     private bool unknownOnly;
+
+    protected override void OnInitialized() =>
+        Prefs.Changed += OnPrefsChanged;
+
+    public void Dispose() =>
+        Prefs.Changed -= OnPrefsChanged;
+
+    private void OnPrefsChanged() =>
+        _ = InvokeAsync(StateHasChanged);
 
     protected override async Task OnInitializedAsync()
     {

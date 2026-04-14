@@ -6,8 +6,12 @@
 
 <PageTitle>Auth</PageTitle>
 
-<h1>You are authenticated</h1>
+<UIPageHeader Title="Authenticated" Description="You are signed in to AnimalTracker." />
 
-<AuthorizeView>
-    Hello @context.User.Identity?.Name!
-</AuthorizeView>
+<UICard>
+    <AuthorizeView>
+        <Authorized>
+            <p class="text-sm text-slate-700 dark:text-slate-200">Signed in as <span class="font-semibold text-slate-900 dark:text-slate-50">@context.User.Identity?.Name</span>.</p>
+        </Authorized>
+    </AuthorizeView>
+</UICard>

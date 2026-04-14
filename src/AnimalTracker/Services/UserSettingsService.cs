@@ -1,11 +1,12 @@
 using System.Text.RegularExpressions;
 using AnimalTracker.Data;
 using AnimalTracker.Data.Entities;
+using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.EntityFrameworkCore;
 
 namespace AnimalTracker.Services;
 
-public sealed class UserSettingsService(ApplicationDbContext db, CurrentUserService currentUser)
+public sealed class UserSettingsService(ApplicationDbContext db, CurrentUserService currentUser, PhotoStorageService photos)
 {
     private static readonly Regex Hex = new("^#[0-9a-fA-F]{6}$", RegexOptions.Compiled);
 
@@ -53,6 +54,30 @@ public sealed class UserSettingsService(ApplicationDbContext db, CurrentUserServ
         settings.TimelinePageSize = timelinePageSize;
         settings.UpdatedAtUtc = DateTime.UtcNow;
 
+        await db.SaveChangesAsync(cancellationToken);
+        return settings;
+    }
+
+    public async Task<UserSettings> SetBackgroundImageAsync(IBrowserFile file, CancellationToken cancellationToken = default)
+    {
+        var stored = await photos.SaveBackgroundImageAsync(file, cancellationToken: cancellationToken);
+        var settings = await GetOrCreateAsync(cancellationToken);
+
+        if (!string.IsNullOrWhiteSpace(settings.BackgroundImageRelativePath))
+            photos.TryDeleteStoredFile(settings.BackgroundImageRelativePath);
+
+        settings.BackgroundImageRelativePath = stored.StoredRelativePath;
+        settings.UpdatedAtUtc = DateTime.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+        return settings;
+    }
+
+    public async Task<UserSettings> ClearBackgroundImageAsync(CancellationToken cancellationToken = default)
+    {
+        var settings = await GetOrCreateAsync(cancellationToken);
+        photos.TryDeleteStoredFile(settings.BackgroundImageRelativePath);
+        settings.BackgroundImageRelativePath = null;
+        settings.UpdatedAtUtc = DateTime.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
         return settings;
     }

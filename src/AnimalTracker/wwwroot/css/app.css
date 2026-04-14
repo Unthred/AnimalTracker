@@ -10,8 +10,21 @@
     --accent: #0f172a;
   }
 
+  input[type="checkbox"] {
+    accent-color: var(--accent);
+  }
+
+  /* Slightly rounded checkboxes to match rounded-xl inputs (browser support varies). */
+  .checkbox-soft {
+    /* Match select/input field surfaces */
+    @apply rounded-lg border border-slate-200/90 bg-white shadow-sm transition duration-200 ease-in-out;
+    @apply hover:border-slate-300 hover:shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600;
+    @apply focus:outline-none focus:ring-2 focus:ring-slate-300/80 dark:focus:ring-slate-600/80;
+  }
+
+  /* Transparent so full-page backgrounds (MainLayout) paint above the canvas; routes supply their own base fill. */
   html, body {
-    @apply bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-50;
+    @apply min-h-dvh bg-transparent font-sans text-slate-900 antialiased leading-relaxed dark:text-slate-50;
   }
 
   a {
@@ -32,6 +45,57 @@
 }
 
 @layer components {
+  .accent-text {
+    color: var(--accent);
+  }
+
+  .accent-border {
+    border-color: var(--accent);
+  }
+
+  .accent-bg {
+    background-color: var(--accent);
+    color: white;
+  }
+
+  .accent-bg:hover {
+    filter: brightness(0.95);
+  }
+
+  .accent-bg-soft {
+    background-color: color-mix(in srgb, var(--accent) 12%, transparent);
+  }
+
+  .accent-bg-soft:hover {
+    background-color: color-mix(in srgb, var(--accent) 18%, transparent);
+  }
+
+  .app-nav-link {
+    @apply block rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 transition duration-200 ease-in-out dark:text-slate-200;
+    text-decoration: none;
+  }
+
+  .app-nav-link:hover {
+    background-color: color-mix(in srgb, var(--accent) 12%, transparent);
+  }
+
+  .app-nav-link.active {
+    background-color: color-mix(in srgb, var(--accent) 16%, transparent);
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .app-nav-link:hover {
+      background-color: color-mix(in srgb, var(--accent) 22%, rgb(2 6 23)); /* slate-950 */
+    }
+
+    .app-nav-link.active {
+      background-color: color-mix(in srgb, var(--accent) 28%, rgb(2 6 23)); /* slate-950 */
+      color: color-mix(in srgb, var(--accent) 70%, white);
+    }
+  }
+
   /* Bootstrap-ish class compatibility for Identity UI */
   .container,
   .container-fluid {
@@ -60,9 +124,10 @@
   .form-control,
   .form-select,
   .form-check-input {
-    @apply w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm outline-none;
-    @apply focus:border-slate-400 focus:ring-4 focus:ring-slate-200;
-    @apply dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:focus:ring-slate-800;
+    @apply w-full rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm outline-none transition duration-200 ease-in-out;
+    @apply hover:border-slate-300 hover:shadow-sm;
+    @apply focus:border-slate-300 focus:ring-4 focus:ring-slate-200/70;
+    @apply dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80;
   }
 
   .form-check-input {
@@ -75,7 +140,7 @@
   }
 
   .btn {
-    @apply inline-flex items-center justify-center rounded-md px-3 py-2 text-sm font-semibold;
+    @apply inline-flex items-center justify-center rounded-xl px-3 py-2 text-sm font-semibold transition duration-200 ease-in-out;
     @apply focus:outline-none focus:ring-4 focus:ring-slate-200;
   }
 
@@ -106,9 +171,10 @@
   input[type="datetime-local"],
   textarea,
   select {
-    @apply rounded-md border border-slate-300 bg-white text-slate-900;
-    @apply focus:border-slate-400 focus:ring-4 focus:ring-slate-200;
-    @apply dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:focus:ring-slate-800;
+    @apply rounded-xl border border-slate-200/90 bg-white text-slate-900 shadow-sm transition duration-200 ease-in-out;
+    @apply hover:border-slate-300 hover:shadow-sm;
+    @apply focus:border-slate-300 focus:ring-4 focus:ring-slate-200/70;
+    @apply dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80;
   }
 
   /* Dropdown option list readability in dark mode */
@@ -117,6 +183,20 @@
       background-color: rgb(15 23 42); /* slate-900 */
       color: rgb(248 250 252); /* slate-50 */
     }
+
+    /* Ensure selected + hovered options are visible in the opened list */
+    select option:checked,
+    select option:hover {
+      background-color: color-mix(in srgb, var(--accent) 28%, rgb(15 23 42));
+      color: rgb(248 250 252);
+    }
+  }
+
+  /* Some browsers need explicit selected option styling even in light mode */
+  select option:checked,
+  select option:hover {
+    background-color: color-mix(in srgb, var(--accent) 18%, white);
+    color: rgb(15 23 42); /* slate-900 */
   }
 
   .btn-danger {
@@ -157,7 +237,7 @@
   }
 
   table.table {
-    @apply w-full border-separate border-spacing-0 overflow-hidden rounded-lg border border-slate-200;
+    @apply w-full border-separate border-spacing-0 overflow-hidden rounded-xl border border-slate-200/90 shadow-sm;
   }
 
   table.table th {
