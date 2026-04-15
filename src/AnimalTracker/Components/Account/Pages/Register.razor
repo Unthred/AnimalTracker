@@ -17,41 +17,48 @@
 
 <PageTitle>Register</PageTitle>
 
-<h1>Register</h1>
+<div class="pointer-events-none fixed inset-0 -z-10 bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900"></div>
+<div class="pointer-events-none fixed inset-0 -z-10 opacity-60 [background:radial-gradient(600px_circle_at_20%_10%,color-mix(in_srgb,var(--accent)_18%,transparent),transparent_55%),radial-gradient(600px_circle_at_80%_20%,rgba(99,102,241,0.18),transparent_55%)]"></div>
 
-<div class="row">
-    <div class="col-lg-6">
+<div class="mx-auto w-full max-w-xl py-10 sm:py-14">
+    <UIPageHeader Title="Create account" Description="Register to start tracking sightings." />
+
+    <UICard>
         <StatusMessage Message="@Message" />
-        <EditForm Model="Input" method="post" OnValidSubmit="RegisterUser" FormName="register">
+
+        <EditForm Model="Input" method="post" OnValidSubmit="RegisterUser" FormName="register" class="space-y-6">
             <DataAnnotationsValidator />
-            <h2>Create a new account.</h2>
-            <hr />
             <ValidationSummary class="text-danger" role="alert" />
-            <div class="form-floating mb-3">
-                <InputText @bind-Value="Input.Email" id="Input.Email" class="form-control" autocomplete="username" aria-required="true" placeholder="name@example.com" />
-                <label for="Input.Email">Email</label>
+
+            <UIField Label="Email" For="Input.Email">
+                <InputText @bind-Value="Input.Email" id="Input.Email" class="w-full min-w-0 px-3 py-2.5"
+                           autocomplete="username" aria-required="true" placeholder="name@example.com" />
                 <ValidationMessage For="() => Input.Email" class="text-danger" />
-            </div>
-            <div class="form-floating mb-3">
-                <InputText type="password" @bind-Value="Input.Password" id="Input.Password" class="form-control" autocomplete="new-password" aria-required="true" placeholder="password" />
-                <label for="Input.Password">Password</label>
+            </UIField>
+
+            <UIField Label="Password" For="Input.Password">
+                <InputText type="password" @bind-Value="Input.Password" id="Input.Password" class="w-full min-w-0 px-3 py-2.5"
+                           autocomplete="new-password" aria-required="true" placeholder="••••••••" />
                 <ValidationMessage For="() => Input.Password" class="text-danger" />
-            </div>
-            <div class="form-floating mb-3">
-                <InputText type="password" @bind-Value="Input.ConfirmPassword" id="Input.ConfirmPassword" class="form-control" autocomplete="new-password" aria-required="true" placeholder="password" />
-                <label for="Input.ConfirmPassword">Confirm Password</label>
+            </UIField>
+
+            <UIField Label="Confirm password" For="Input.ConfirmPassword">
+                <InputText type="password" @bind-Value="Input.ConfirmPassword" id="Input.ConfirmPassword" class="w-full min-w-0 px-3 py-2.5"
+                           autocomplete="new-password" aria-required="true" placeholder="••••••••" />
                 <ValidationMessage For="() => Input.ConfirmPassword" class="text-danger" />
+            </UIField>
+
+            <UIButton Type="submit" Variant="UiButtonVariant.Primary" Class="w-full">Register</UIButton>
+
+            <div class="text-sm text-slate-600 dark:text-slate-300">
+                Already have an account?
+                <a class="font-medium text-slate-900 hover:underline dark:text-slate-50"
+                   href="@(NavigationManager.GetUriWithQueryParameters("Account/Login", new Dictionary<string, object?> { ["ReturnUrl"] = ReturnUrl }))">Log in</a>
             </div>
-            <button type="submit" class="w-100 btn btn-lg btn-primary">Register</button>
         </EditForm>
-    </div>
-    <div class="col-lg-4 col-lg-offset-2">
-        <section>
-            <h3>Use another service to register.</h3>
-            <hr />
-            <ExternalLoginPicker />
-        </section>
-    </div>
+    </UICard>
+
+    @* External providers not used for this app *@
 </div>
 
 @code {
