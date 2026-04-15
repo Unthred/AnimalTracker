@@ -180,5 +180,23 @@ public sealed class SightingService(ApplicationDbContext db, CurrentUserService 
         db.Sightings.Remove(entity);
         await db.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task DeletePhotoAsync(int sightingPhotoId, CancellationToken cancellationToken = default)
+    {
+        var userId = await currentUser.GetRequiredUserIdAsync(cancellationToken);
+
+        var photo = await db.SightingPhotos
+            .Include(p => p.Sighting)
+            .FirstOrDefaultAsync(p => p.Id == sightingPhotoId, cancellationToken);
+
+        if (photo is null || photo.Sighting.OwnerUserId != userId)
+            throw new InvalidOperationException("Photo not found.");
+
+        // Delete disk file first; even if it fails, still delete DB row to allow user to proceed.
+        photos.TryDeleteStoredFile(photo.StoredPath);
+
+        db.SightingPhotos.Remove(photo);
+        await db.SaveChangesAsync(cancellationToken);
+    }
 }
 

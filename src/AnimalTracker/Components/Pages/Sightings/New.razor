@@ -5,11 +5,15 @@
 @attribute [Authorize]
 
 @using AnimalTracker.Services
+@using AnimalTracker.Components.UI
 @using AnimalTracker.Data.Entities
+@using AnimalTracker.Data
 @inject SightingService Sightings
 @inject SpeciesService Species
 @inject LocationService Locations
 @inject NavigationManager Nav
+@inject ApplicationDbContext Db
+@inject PhotoStorageService Storage
 
 <PageTitle>Add Sighting</PageTitle>
 
@@ -23,8 +27,7 @@
             <UIField Label="When" For="occurredAt">
                 <div class="min-w-0">
                     <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Date</span>
-                    <InputDate id="occurredAt" @bind-Value="model.OccurredAtLocalDate"
-                               class="block w-full min-w-0 max-w-full rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:focus:ring-slate-800/80" />
+                    <UIDatePicker id="occurredAt" @bind-Value="model.OccurredAtLocalDate" />
                     <ValidationMessage For="() => model.OccurredAtLocalDate" />
                 </div>
             </UIField>
@@ -79,6 +82,19 @@
             <InputTextArea id="notes" class="w-full min-w-0 px-3 py-2.5" @bind-Value="model.Notes" rows="4" />
         </UIField>
 
+        <UIField Label="Photos" For="photos" Hint="Optional. Up to 25 MB each. Images are resized/compressed on upload for performance.">
+            <InputFile OnChange="OnPhotosSelected" multiple accept="image/*"
+                       class="block w-full cursor-pointer rounded-xl border border-dashed border-slate-200/90 bg-slate-50/50 px-4 py-6 text-sm text-slate-600 transition duration-200 file:mr-4 file:cursor-pointer file:rounded-lg file:border-0 file:bg-[var(--accent)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-950/50 dark:text-slate-300 dark:hover:border-slate-600" />
+            @if (selectedPhotos.Count > 0)
+            {
+                <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">@selectedPhotos.Count selected</p>
+            }
+            @if (!string.IsNullOrWhiteSpace(uploadError))
+            {
+                <p class="mt-3 text-sm text-red-700 dark:text-red-300">@uploadError</p>
+            }
+        </UIField>
+
         <div class="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:flex-wrap sm:justify-end sm:gap-3">
             <UIButton Href="/" Variant="UiButtonVariant.Outline" Class="w-full sm:w-auto">Cancel</UIButton>
             <UIButton Type="submit" Variant="UiButtonVariant.Primary" Class="w-full sm:w-auto">Save sighting</UIButton>
@@ -93,6 +109,8 @@
     private readonly Model model = new();
     private int hourPart;
     private int minutePart;
+    private readonly List<IBrowserFile> selectedPhotos = [];
+    private string? uploadError;
 
     protected override async Task OnInitializedAsync()
     {
@@ -118,8 +136,16 @@
     private void SyncModelTimeFromParts() =>
         model.OccurredAtLocalTime = $"{hourPart:D2}:{minutePart:D2}";
 
+    private void OnPhotosSelected(InputFileChangeEventArgs e)
+    {
+        uploadError = null;
+        selectedPhotos.Clear();
+        selectedPhotos.AddRange(e.GetMultipleFiles());
+    }
+
     private async Task SaveAsync()
     {
+        uploadError = null;
         var occurredAtUtc = model.GetOccurredAtUtc();
         var created = await Sightings.CreateAsync(
             occurredAtUtc: occurredAtUtc,
@@ -127,6 +153,33 @@
             locationId: model.LocationId,
             animalId: null,
             notes: model.Notes);
+
+        if (selectedPhotos.Count > 0)
+        {
+            try
+            {
+                foreach (var file in selectedPhotos)
+                {
+                    var stored = await Storage.SaveSightingPhotoAsync(file);
+                    Db.SightingPhotos.Add(new SightingPhoto
+                    {
+                        SightingId = created.Id,
+                        StoredPath = stored.StoredRelativePath,
+                        OriginalFileName = stored.OriginalFileName,
+                        ContentType = stored.ContentType,
+                        SizeBytes = stored.SizeBytes,
+                        CreatedAtUtc = DateTime.UtcNow
+                    });
+                }
+                await Db.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                // Sighting is already created; keep user on the page with an error instead of navigating.
+                uploadError = ex.Message;
+                return;
+            }
+        }
 
         Nav.NavigateTo($"/sightings/{created.Id}");
     }
