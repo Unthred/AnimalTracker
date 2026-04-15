@@ -130,6 +130,65 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
     KnownIPNetworks = { },
     KnownProxies = { }
 });
+
+// Diagnostics for reverse-proxy/static-runtime troubleshooting in production.
+// Logs requests to Blazor runtime/script endpoints with host + forwarded headers
+// so we can quickly identify where 404/400 responses are introduced.
+app.Use(async (context, next) =>
+{
+    var path = context.Request.Path.Value ?? string.Empty;
+    var isBlazorRuntimePath =
+        path.StartsWith("/_framework", StringComparison.OrdinalIgnoreCase) ||
+        path.StartsWith("/_blazor", StringComparison.OrdinalIgnoreCase);
+
+    if (!isBlazorRuntimePath)
+    {
+        await next();
+        return;
+    }
+
+    var host = context.Request.Host.Value;
+    var method = context.Request.Method;
+    var xfh = context.Request.Headers["X-Forwarded-Host"].ToString();
+    var xfp = context.Request.Headers["X-Forwarded-Proto"].ToString();
+    var ua = context.Request.Headers.UserAgent.ToString();
+    var traceId = context.TraceIdentifier;
+    var logger = context.RequestServices.GetRequiredService<ILoggerFactory>()
+        .CreateLogger("AnimalTracker.RuntimePaths");
+
+    await next();
+
+    var statusCode = context.Response.StatusCode;
+    var contentType = context.Response.ContentType ?? "(none)";
+
+    if (statusCode >= 400)
+    {
+        logger.LogWarning(
+            "Blazor runtime request failed: {Method} {Path} -> {StatusCode}. Host={Host} XFH={XForwardedHost} XFP={XForwardedProto} ContentType={ContentType} TraceId={TraceId} UA={UserAgent}",
+            method,
+            path,
+            statusCode,
+            host,
+            xfh,
+            xfp,
+            contentType,
+            traceId,
+            ua);
+    }
+    else
+    {
+        logger.LogInformation(
+            "Blazor runtime request: {Method} {Path} -> {StatusCode}. Host={Host} XFH={XForwardedHost} XFP={XForwardedProto} ContentType={ContentType} TraceId={TraceId}",
+            method,
+            path,
+            statusCode,
+            host,
+            xfh,
+            xfp,
+            contentType,
+            traceId);
+    }
+});
 app.UseRequestLocalization();
 if (app.Environment.IsDevelopment())
 {
@@ -232,6 +291,10 @@ app.Use(async (context, next) =>
 });
 
 app.UseAntiforgery();
+
+// Production fallback: serve wwwroot static files directly (including /_framework/*)
+// so Blazor runtime scripts are available behind varied proxy/container setups.
+app.UseStaticFiles();
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
