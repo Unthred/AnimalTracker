@@ -24,23 +24,35 @@
     <div class="min-w-0 space-y-6">
         <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8 lg:grid-cols-2">
             <UIField Label="Species" For="species">
-                <select id="species" class="w-full min-w-0 px-3 py-2.5" @bind="selectedSpeciesId">
-                    <option value="">All</option>
+                <input id="species"
+                       list="species-options"
+                       class="w-full min-w-0 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80"
+                       placeholder="All or type to filter"
+                       autocomplete="off"
+                       value="@selectedSpeciesName"
+                       @oninput="OnSpeciesInputAsync" />
+                <datalist id="species-options">
                     @foreach (var s in species)
                     {
-                        <option value="@s.Id">@s.Name</option>
+                        <option value="@s.Name"></option>
                     }
-                </select>
+                </datalist>
             </UIField>
 
             <UIField Label="Location" For="location">
-                <select id="location" class="w-full min-w-0 px-3 py-2.5" @bind="selectedLocationId">
-                    <option value="">All</option>
+                <input id="location"
+                       list="location-options"
+                       class="w-full min-w-0 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80"
+                       placeholder="All or type to filter"
+                       autocomplete="off"
+                       value="@selectedLocationName"
+                       @oninput="OnLocationInputAsync" />
+                <datalist id="location-options">
                     @foreach (var l in locations)
                     {
-                        <option value="@l.Id">@l.Name</option>
+                        <option value="@l.Name"></option>
                     }
-                </select>
+                </datalist>
             </UIField>
         </div>
 
@@ -49,14 +61,11 @@
                 <label for="unknownOnly" class="inline-flex cursor-pointer items-center gap-3 text-sm font-medium text-slate-700 dark:text-slate-200">
                     <input id="unknownOnly" type="checkbox"
                            class="checkbox-soft size-[1.125rem] shrink-0"
-                           @bind="unknownOnly" />
+                           @bind="unknownOnly"
+                           @bind:after="OnFiltersChangedAsync" />
                     Unknown only
                 </label>
                 <p class="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-400">Only sightings without a linked animal.</p>
-            </div>
-
-            <div class="flex sm:justify-end">
-                <UIButton Variant="UiButtonVariant.Outline" Class="w-full sm:w-auto" @onclick="ReloadAsync">Apply filters</UIButton>
             </div>
         </div>
     </div>
@@ -115,11 +124,16 @@
 </div>
 
 @code {
+    private static readonly TimeSpan FilterDebounceDelay = TimeSpan.FromMilliseconds(200);
+
     private bool loading = true;
     private List<Species> species = [];
     private List<Location> locations = [];
     private List<Sighting> sightings = [];
+    private CancellationTokenSource? filterDebounceCts;
 
+    private string? selectedSpeciesName;
+    private string? selectedLocationName;
     private int? selectedSpeciesId;
     private int? selectedLocationId;
     private bool unknownOnly;
@@ -127,8 +141,12 @@
     protected override void OnInitialized() =>
         Prefs.Changed += OnPrefsChanged;
 
-    public void Dispose() =>
+    public void Dispose()
+    {
         Prefs.Changed -= OnPrefsChanged;
+        filterDebounceCts?.Cancel();
+        filterDebounceCts?.Dispose();
+    }
 
     private void OnPrefsChanged() =>
         _ = InvokeAsync(StateHasChanged);
@@ -143,6 +161,8 @@
     private async Task ReloadAsync()
     {
         loading = true;
+        selectedSpeciesId = ResolveSpeciesId(selectedSpeciesName);
+        selectedLocationId = ResolveLocationId(selectedLocationName);
         var filters = new SightingFilters(
             FromUtc: null,
             ToUtc: null,
@@ -154,5 +174,64 @@
         var take = Prefs.TimelinePageSize is > 0 and <= 200 ? Prefs.TimelinePageSize : 50;
         sightings = await Sightings.GetRecentAsync(take, filters);
         loading = false;
+    }
+
+    private int? ResolveSpeciesId(string? speciesName)
+    {
+        var name = (speciesName ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(name))
+            return null;
+
+        return species.FirstOrDefault(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase))?.Id;
+    }
+
+    private int? ResolveLocationId(string? locationName)
+    {
+        var name = (locationName ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(name))
+            return null;
+
+        return locations.FirstOrDefault(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase))?.Id;
+    }
+
+    private async Task OnSpeciesInputAsync(ChangeEventArgs e)
+    {
+        selectedSpeciesName = e.Value?.ToString();
+        await ScheduleReloadAsync();
+    }
+
+    private async Task OnLocationInputAsync(ChangeEventArgs e)
+    {
+        selectedLocationName = e.Value?.ToString();
+        await ScheduleReloadAsync();
+    }
+
+    private Task OnFiltersChangedAsync() => ScheduleReloadAsync();
+
+    private async Task ScheduleReloadAsync()
+    {
+        filterDebounceCts?.Cancel();
+        filterDebounceCts?.Dispose();
+
+        var cts = new CancellationTokenSource();
+        filterDebounceCts = cts;
+        try
+        {
+            await Task.Delay(FilterDebounceDelay, cts.Token);
+            if (!cts.IsCancellationRequested)
+                await ReloadAsync();
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected when new input supersedes a pending filter refresh.
+        }
+        finally
+        {
+            if (ReferenceEquals(filterDebounceCts, cts))
+            {
+                filterDebounceCts = null;
+                cts.Dispose();
+            }
+        }
     }
 }

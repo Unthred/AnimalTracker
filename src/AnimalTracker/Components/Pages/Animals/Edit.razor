@@ -35,14 +35,19 @@ else
             <DataAnnotationsValidator />
 
             <UIField Label="Species" For="species">
-                <select id="species" class="w-full min-w-0 px-3 py-2.5" @bind="model.SpeciesId">
-                    <option value="">Select…</option>
+                <InputText id="species"
+                           list="species-options"
+                           class="w-full min-w-0 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80"
+                           placeholder="Select or type a new species"
+                           autocomplete="off"
+                           @bind-Value="model.SpeciesName" />
+                <datalist id="species-options">
                     @foreach (var s in species)
                     {
-                        <option value="@s.Id">@s.Name</option>
+                        <option value="@s.Name"></option>
                     }
-                </select>
-                <ValidationMessage For="() => model.SpeciesId" />
+                </datalist>
+                <ValidationMessage For="() => model.SpeciesName" />
             </UIField>
 
             <UIField Label="Name (optional)" For="displayName">
@@ -86,7 +91,7 @@ else
         animal = await Animals.GetAsync(Id);
         if (animal is not null)
         {
-            model.SpeciesId = animal.SpeciesId;
+            model.SpeciesName = species.FirstOrDefault(x => x.Id == animal.SpeciesId)?.Name ?? animal.Species.Name;
             model.DisplayName = animal.DisplayName;
             model.IdentifyingFeatures = animal.IdentifyingFeatures;
             model.Notes = animal.Notes;
@@ -100,9 +105,10 @@ else
         error = null;
         try
         {
+            var speciesId = await ResolveSpeciesIdAsync();
             var updated = await Animals.UpdateAsync(
                 id: Id,
-                speciesId: model.SpeciesId!.Value,
+                speciesId: speciesId,
                 displayName: model.DisplayName,
                 identifyingFeatures: model.IdentifyingFeatures,
                 notes: model.Notes);
@@ -115,10 +121,24 @@ else
         }
     }
 
+    private async Task<int> ResolveSpeciesIdAsync()
+    {
+        var speciesName = (model.SpeciesName ?? "").Trim();
+        var existingSpecies = species.FirstOrDefault(x => string.Equals(x.Name, speciesName, StringComparison.OrdinalIgnoreCase));
+        if (existingSpecies is not null)
+            return existingSpecies.Id;
+
+        var createdSpecies = await Species.CreateAsync(speciesName, description: null);
+        species = species.Append(createdSpecies).OrderBy(x => x.Name).ToList();
+        return createdSpecies.Id;
+    }
+
     private sealed class Model
     {
         [System.ComponentModel.DataAnnotations.Required]
-        public int? SpeciesId { get; set; }
+        [System.ComponentModel.DataAnnotations.RegularExpression(@".*\S.*", ErrorMessage = "Species is required.")]
+        [System.ComponentModel.DataAnnotations.StringLength(200)]
+        public string SpeciesName { get; set; } = "";
 
         public string? DisplayName { get; set; }
         public string? IdentifyingFeatures { get; set; }

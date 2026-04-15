@@ -52,7 +52,6 @@
     private string? lastAppliedThemeMode;
     private string? lastAppliedUserId;
     private string appDefaultThemeMode = "system";
-    private bool appDefaultLoaded;
     private bool waitingForAuthenticatedUser;
     private int authProbeAttempts;
     private bool authProbeScheduled;
@@ -141,13 +140,8 @@
         {
             lastAppliedUserId = null;
             waitingForAuthenticatedUser = true;
-
-            if (!appDefaultLoaded)
-            {
-                var appDefaults = await AppSettings.GetOrCreateAsync();
-                appDefaultThemeMode = NormalizeThemeMode(appDefaults.DefaultThemeMode);
-                appDefaultLoaded = true;
-            }
+            var appDefaults = await AppSettings.GetOrCreateAsync();
+            appDefaultThemeMode = NormalizeThemeMode(appDefaults.DefaultThemeMode);
 
             desiredThemeMode = appDefaultThemeMode;
         }

@@ -62,8 +62,8 @@
 
         <UIField Label="Theme" For="themeMode" Hint="Choose Light, Dark, or follow your system setting.">
             <select id="themeMode" class="w-full max-w-xs min-w-0 px-3 py-2.5"
-                    @bind="model.ThemeMode"
-                    @bind:after="OnThemeModeChanged">
+                    value="@model.ThemeMode"
+                    @onchange="OnThemeModeChangedAsync">
                 <option value="system">Follow system</option>
                 <option value="light">Light</option>
                 <option value="dark">Dark</option>
@@ -244,12 +244,6 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
-        {
-            // Ensure first visit to settings reflects persisted selection.
-            await JS.InvokeVoidAsync("animalTrackerSetTheme", model.ThemeMode);
-        }
-
         var changed = await RefreshEffectiveThemeModeAsync();
         if (changed)
             await InvokeAsync(StateHasChanged);
@@ -258,6 +252,7 @@
     private async Task ReloadSettingsModelAsync()
     {
         var s = await Settings.GetOrCreateAsync();
+        Prefs.Apply(s);
         model.AccentColorHex = s.AccentColorHex;
         model.CompactMode = s.CompactMode;
         model.TimelinePageSize = s.TimelinePageSize;
@@ -286,12 +281,9 @@
         speciesLoading = false;
     }
 
-    private void OnThemeModeChanged() =>
-        _ = OnThemeModeChangedAsync();
-
-    private async Task OnThemeModeChangedAsync()
+    private async Task OnThemeModeChangedAsync(ChangeEventArgs e)
     {
-        model.ThemeMode = NormalizeThemeMode(model.ThemeMode);
+        model.ThemeMode = NormalizeThemeMode(e.Value?.ToString());
         Prefs.SetThemeMode(model.ThemeMode);
 
         try

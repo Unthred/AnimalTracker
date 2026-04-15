@@ -22,20 +22,23 @@
 <UICard Class="mt-2">
     <div class="grid min-w-0 grid-cols-1 gap-6 md:grid-cols-3 md:gap-8">
         <UIField Label="Search" For="q" Class="md:col-span-2">
-            <input id="q" type="search" class="w-full min-w-0 px-3 py-2.5" @bind="query" @bind:event="oninput" />
+            <input id="q" type="search" class="w-full min-w-0 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80" value="@query" @oninput="OnSearchInputAsync" />
         </UIField>
         <UIField Label="Species" For="species">
-            <select id="species" class="w-full min-w-0 px-3 py-2.5" @bind="speciesId">
-                <option value="">All</option>
+            <input id="species"
+                   list="species-options"
+                   class="w-full min-w-0 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80"
+                   placeholder="All or type to filter"
+                   autocomplete="off"
+                   value="@speciesName"
+                   @oninput="OnSpeciesInputAsync" />
+            <datalist id="species-options">
                 @foreach (var s in species)
                 {
-                    <option value="@s.Id">@s.Name</option>
+                    <option value="@s.Name"></option>
                 }
-            </select>
+            </datalist>
         </UIField>
-    </div>
-    <div class="mt-6 flex justify-stretch sm:justify-start">
-        <UIButton Variant="UiButtonVariant.Outline" Class="w-full sm:w-auto" @onclick="ReloadAsync">Apply filters</UIButton>
     </div>
 </UICard>
 
@@ -71,18 +74,26 @@
 </div>
 
 @code {
+    private static readonly TimeSpan FilterDebounceDelay = TimeSpan.FromMilliseconds(200);
+
     private bool loading = true;
     private List<Species> species = [];
     private List<Animal> animals = [];
+    private CancellationTokenSource? filterDebounceCts;
 
     private string? query;
+    private string? speciesName;
     private int? speciesId;
 
     protected override void OnInitialized() =>
         Prefs.Changed += OnPrefsChanged;
 
-    public void Dispose() =>
+    public void Dispose()
+    {
         Prefs.Changed -= OnPrefsChanged;
+        filterDebounceCts?.Cancel();
+        filterDebounceCts?.Dispose();
+    }
 
     private void OnPrefsChanged() =>
         _ = InvokeAsync(StateHasChanged);
@@ -96,7 +107,56 @@
     private async Task ReloadAsync()
     {
         loading = true;
+        speciesId = ResolveSpeciesId(speciesName);
         animals = await Animals.SearchAsync(query, speciesId);
         loading = false;
+    }
+
+    private int? ResolveSpeciesId(string? name)
+    {
+        var trimmed = (name ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(trimmed))
+            return null;
+
+        return species.FirstOrDefault(x => string.Equals(x.Name, trimmed, StringComparison.OrdinalIgnoreCase))?.Id;
+    }
+
+    private async Task OnSearchInputAsync(ChangeEventArgs e)
+    {
+        query = e.Value?.ToString();
+        await ScheduleReloadAsync();
+    }
+
+    private async Task OnSpeciesInputAsync(ChangeEventArgs e)
+    {
+        speciesName = e.Value?.ToString();
+        await ScheduleReloadAsync();
+    }
+
+    private async Task ScheduleReloadAsync()
+    {
+        filterDebounceCts?.Cancel();
+        filterDebounceCts?.Dispose();
+
+        var cts = new CancellationTokenSource();
+        filterDebounceCts = cts;
+        try
+        {
+            await Task.Delay(FilterDebounceDelay, cts.Token);
+            if (!cts.IsCancellationRequested)
+                await ReloadAsync();
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected when new input supersedes a pending filter refresh.
+        }
+        finally
+        {
+            if (ReferenceEquals(filterDebounceCts, cts))
+            {
+                filterDebounceCts = null;
+                cts.Dispose();
+            }
+        }
     }
 }

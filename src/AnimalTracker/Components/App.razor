@@ -1,8 +1,10 @@
 ﻿<!DOCTYPE html>
 @inject IHttpContextAccessor HttpContextAccessor
 @{
+    var resolvedTheme = HttpContextAccessor.HttpContext?.Items["animaltracker_resolved_theme"]?.ToString();
     var themeCookie = HttpContextAccessor.HttpContext?.Request.Cookies["animaltracker_theme"];
-    var initialHtmlClass = string.Equals(themeCookie, "dark", StringComparison.OrdinalIgnoreCase) ? "dark" : "";
+    var initialTheme = !string.IsNullOrWhiteSpace(resolvedTheme) ? resolvedTheme : themeCookie;
+    var initialHtmlClass = string.Equals(initialTheme, "dark", StringComparison.OrdinalIgnoreCase) ? "dark" : "";
 }
 <html lang="en" class="@initialHtmlClass">
 
@@ -15,6 +17,7 @@
         // (including /Account pages) start in the correct palette.
         (() => {
             try {
+                const serverTheme = @System.Text.Json.JsonSerializer.Serialize((initialTheme ?? "").ToLowerInvariant());
                 const readCookie = (name) => {
                     const prefix = name + '=';
                     const parts = document.cookie.split(';');
@@ -24,7 +27,7 @@
                     }
                     return null;
                 };
-                const mode = (readCookie('animaltracker_theme') || 'system').toLowerCase();
+                const mode = (serverTheme || readCookie('animaltracker_theme') || 'system').toLowerCase();
                 const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
                 const dark = mode === 'dark' || (mode === 'system' && prefersDark);
                 document.documentElement.classList.toggle('dark', !!dark);
@@ -47,7 +50,8 @@
     <UserTheme />
     <Routes />
     <ReconnectModal />
-    <script src="@Assets["_framework/blazor.server.js"]"></script>
+    <script src="@Assets["_framework/blazor.web.js"]"
+            onerror="this.onerror=null;this.src='@Assets["_framework/blazor.server.js"]'"></script>
     <script src="@Assets["Components/Account/Shared/PasskeySubmit.razor.js"]" type="module"></script>
     <script>
         // Theme mode: "system" | "light" | "dark"

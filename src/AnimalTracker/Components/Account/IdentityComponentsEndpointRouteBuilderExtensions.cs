@@ -43,9 +43,22 @@ internal static class IdentityComponentsEndpointRouteBuilderExtensions
 
         accountGroup.MapPost("/Logout", async (
             ClaimsPrincipal user,
+            HttpContext context,
             [FromServices] SignInManager<ApplicationUser> signInManager,
+            [FromServices] AnimalTracker.Services.AppSettingsService appSettings,
             [FromForm] string returnUrl) =>
         {
+            var appDefaults = await appSettings.GetOrCreateAsync();
+            var themeMode = NormalizeThemeMode(appDefaults.DefaultThemeMode);
+            context.Response.Cookies.Append("animaltracker_theme", themeMode, new CookieOptions
+            {
+                Path = "/",
+                SameSite = SameSiteMode.Lax,
+                HttpOnly = false,
+                IsEssential = true,
+                MaxAge = TimeSpan.FromDays(180),
+                Secure = context.Request.IsHttps
+            });
             await signInManager.SignOutAsync();
             return TypedResults.LocalRedirect($"~/{returnUrl}");
         });
@@ -148,5 +161,11 @@ internal static class IdentityComponentsEndpointRouteBuilderExtensions
         });
 
         return accountGroup;
+    }
+
+    private static string NormalizeThemeMode(string? mode)
+    {
+        var normalized = (mode ?? string.Empty).Trim().ToLowerInvariant();
+        return normalized is "light" or "dark" ? normalized : "system";
     }
 }

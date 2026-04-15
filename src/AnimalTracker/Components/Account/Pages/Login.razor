@@ -4,6 +4,7 @@
 @using Microsoft.AspNetCore.Authentication
 @using Microsoft.AspNetCore.Identity
 @using AnimalTracker.Data
+@using Microsoft.EntityFrameworkCore
 
 @inject UserManager<ApplicationUser> UserManager
 @inject SignInManager<ApplicationUser> SignInManager
@@ -11,6 +12,7 @@
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
 @inject AnimalTracker.Services.AppSettingsService AppSettings
+@inject ApplicationDbContext Db
 
 <PageTitle>Log in</PageTitle>
 
@@ -143,6 +145,7 @@ else
         if (result.Succeeded)
         {
             Logger.LogInformation("User logged in.");
+            await SetThemeCookieForSignedInUserAsync();
             RedirectManager.RedirectTo(ReturnUrl);
         }
         else if (result.RequiresTwoFactor)
@@ -196,5 +199,39 @@ else
         public bool RememberMe { get; set; }
 
         public PasskeyInputModel? Passkey { get; set; }
+    }
+
+    private async Task SetThemeCookieForSignedInUserAsync()
+    {
+        var fallback = (await AppSettings.GetOrCreateAsync()).DefaultThemeMode;
+        var themeMode = NormalizeThemeMode(fallback);
+
+        var user = await UserManager.FindByEmailAsync(Input.Email);
+        if (user is not null)
+        {
+            var userTheme = await Db.UserSettings.AsNoTracking()
+                .Where(x => x.OwnerUserId == user.Id)
+                .Select(x => x.ThemeMode)
+                .FirstOrDefaultAsync();
+
+            if (!string.IsNullOrWhiteSpace(userTheme))
+                themeMode = NormalizeThemeMode(userTheme);
+        }
+
+        HttpContext.Response.Cookies.Append("animaltracker_theme", themeMode, new CookieOptions
+        {
+            Path = "/",
+            SameSite = SameSiteMode.Lax,
+            HttpOnly = false,
+            IsEssential = true,
+            MaxAge = TimeSpan.FromDays(180),
+            Secure = HttpContext.Request.IsHttps
+        });
+    }
+
+    private static string NormalizeThemeMode(string? mode)
+    {
+        var normalized = (mode ?? "").Trim().ToLowerInvariant();
+        return normalized is "light" or "dark" ? normalized : "system";
     }
 }

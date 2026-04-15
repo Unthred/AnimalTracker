@@ -133,24 +133,50 @@ else
 
             <div class="grid min-w-0 grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8">
                 <UIField Label="Species" For="species">
-                    <select id="species" class="w-full min-w-0 px-3 py-2.5" @bind="model.SpeciesId">
-                        <option value="">Select…</option>
+                    <InputText id="species"
+                               list="species-options"
+                               class="w-full min-w-0 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80"
+                               placeholder="Select or type a new species"
+                               autocomplete="off"
+                               @bind-Value="model.SpeciesName" />
+                    <datalist id="species-options">
                         @foreach (var s in species)
                         {
-                            <option value="@s.Id">@s.Name</option>
+                            <option value="@s.Name"></option>
                         }
-                    </select>
-                    <ValidationMessage For="() => model.SpeciesId" />
+                    </datalist>
+                    <div class="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Type a name and click Add to create it now.</p>
+                        <UIButton Type="button" Variant="UiButtonVariant.Outline" Size="UiButtonSize.Sm" @onclick="AddSpeciesAsync">Add species</UIButton>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(speciesInlineError))
+                    {
+                        <p class="mt-2 text-sm text-red-700 dark:text-red-300">@speciesInlineError</p>
+                    }
+                    <ValidationMessage For="() => model.SpeciesName" />
                 </UIField>
 
                 <UIField Label="Location" For="location">
-                    <select id="location" class="w-full min-w-0 px-3 py-2.5" @bind="model.LocationId">
-                        <option value="">Default</option>
+                    <InputText id="location"
+                               list="location-options"
+                               class="w-full min-w-0 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80"
+                               placeholder="Default or type a new location"
+                               autocomplete="off"
+                               @bind-Value="model.LocationName" />
+                    <datalist id="location-options">
                         @foreach (var l in locations)
                         {
-                            <option value="@l.Id">@l.Name</option>
+                            <option value="@l.Name"></option>
                         }
-                    </select>
+                    </datalist>
+                    <div class="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Optional. Type a name and click Add to create it now.</p>
+                        <UIButton Type="button" Variant="UiButtonVariant.Outline" Size="UiButtonSize.Sm" @onclick="AddLocationAsync">Add location</UIButton>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(locationInlineError))
+                    {
+                        <p class="mt-2 text-sm text-red-700 dark:text-red-300">@locationInlineError</p>
+                    }
                 </UIField>
             </div>
 
@@ -248,6 +274,8 @@ else
     private string? error;
     private string? uploadError;
     private string? deletePhotoError;
+    private string? speciesInlineError;
+    private string? locationInlineError;
     private int? confirmDeletePhotoId;
     private IDisposable? backgroundScope;
 
@@ -275,8 +303,8 @@ else
         sighting = await Sightings.GetAsync(Id);
         if (sighting is not null)
         {
-            model.SpeciesId = sighting.SpeciesId;
-            model.LocationId = sighting.LocationId;
+            model.SpeciesName = species.FirstOrDefault(x => x.Id == sighting.SpeciesId)?.Name ?? sighting.Species.Name;
+            model.LocationName = sighting.Location?.Name;
             model.AnimalId = sighting.AnimalId;
             model.Notes = sighting.Notes;
 
@@ -317,14 +345,18 @@ else
     private async Task SaveAsync()
     {
         error = null;
+        speciesInlineError = null;
+        locationInlineError = null;
         try
         {
+            var speciesId = await ResolveSpeciesIdAsync();
+            var locationId = await ResolveLocationIdAsync();
             var occurredAtUtc = model.GetOccurredAtUtc();
             var updated = await Sightings.UpdateAsync(
                 id: Id,
                 occurredAtUtc: occurredAtUtc,
-                speciesId: model.SpeciesId!.Value,
-                locationId: model.LocationId,
+                speciesId: speciesId,
+                locationId: locationId,
                 animalId: model.AnimalId,
                 notes: model.Notes);
 
@@ -334,6 +366,91 @@ else
         {
             error = ex.Message;
         }
+    }
+
+    private async Task AddSpeciesAsync()
+    {
+        speciesInlineError = null;
+        var speciesName = (model.SpeciesName ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(speciesName))
+        {
+            speciesInlineError = "Enter a species name first.";
+            return;
+        }
+
+        var existingSpecies = species.FirstOrDefault(x => string.Equals(x.Name, speciesName, StringComparison.OrdinalIgnoreCase));
+        if (existingSpecies is not null)
+        {
+            model.SpeciesName = existingSpecies.Name;
+            return;
+        }
+
+        try
+        {
+            var createdSpecies = await Species.CreateAsync(speciesName, description: null);
+            species = species.Append(createdSpecies).OrderBy(x => x.Name).ToList();
+            model.SpeciesName = createdSpecies.Name;
+        }
+        catch (Exception ex)
+        {
+            speciesInlineError = ex.Message;
+        }
+    }
+
+    private async Task AddLocationAsync()
+    {
+        locationInlineError = null;
+        var locationName = (model.LocationName ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(locationName))
+        {
+            locationInlineError = "Enter a location name first.";
+            return;
+        }
+
+        var existingLocation = locations.FirstOrDefault(x => string.Equals(x.Name, locationName, StringComparison.OrdinalIgnoreCase));
+        if (existingLocation is not null)
+        {
+            model.LocationName = existingLocation.Name;
+            return;
+        }
+
+        try
+        {
+            var createdLocation = await Locations.CreateAsync(locationName, notes: null);
+            locations = locations.Append(createdLocation).OrderBy(x => x.Name).ToList();
+            model.LocationName = createdLocation.Name;
+        }
+        catch (Exception ex)
+        {
+            locationInlineError = ex.Message;
+        }
+    }
+
+    private async Task<int> ResolveSpeciesIdAsync()
+    {
+        var speciesName = (model.SpeciesName ?? "").Trim();
+        var existingSpecies = species.FirstOrDefault(x => string.Equals(x.Name, speciesName, StringComparison.OrdinalIgnoreCase));
+        if (existingSpecies is not null)
+            return existingSpecies.Id;
+
+        var createdSpecies = await Species.CreateAsync(speciesName, description: null);
+        species = species.Append(createdSpecies).OrderBy(x => x.Name).ToList();
+        return createdSpecies.Id;
+    }
+
+    private async Task<int?> ResolveLocationIdAsync()
+    {
+        var locationName = (model.LocationName ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(locationName))
+            return null;
+
+        var existingLocation = locations.FirstOrDefault(x => string.Equals(x.Name, locationName, StringComparison.OrdinalIgnoreCase));
+        if (existingLocation is not null)
+            return existingLocation.Id;
+
+        var createdLocation = await Locations.CreateAsync(locationName, notes: null);
+        locations = locations.Append(createdLocation).OrderBy(x => x.Name).ToList();
+        return createdLocation.Id;
     }
 
     private async Task UploadPhotosAsync(InputFileChangeEventArgs e)
@@ -412,9 +529,12 @@ else
     private sealed class Model
     {
         [System.ComponentModel.DataAnnotations.Required]
-        public int? SpeciesId { get; set; }
+        [System.ComponentModel.DataAnnotations.RegularExpression(@".*\S.*", ErrorMessage = "Species is required.")]
+        [System.ComponentModel.DataAnnotations.StringLength(200)]
+        public string SpeciesName { get; set; } = "";
 
-        public int? LocationId { get; set; }
+        [System.ComponentModel.DataAnnotations.StringLength(200)]
+        public string? LocationName { get; set; }
 
         public int? AnimalId { get; set; }
 
