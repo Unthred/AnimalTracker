@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 using AnimalTracker.Components;
 using AnimalTracker.Components.Account;
@@ -62,6 +63,7 @@ builder.Services.AddIdentityCore<ApplicationUser>(options =>
     .AddDefaultTokenProviders();
 
 builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
+builder.Services.AddScoped<IClaimsTransformation, RoleClaimsTransformation>();
 
 // Persist keys so auth cookies survive container restarts.
 builder.Services.AddDataProtection()
@@ -141,6 +143,93 @@ else
 }
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
+
+// Local/dev resilience:
+// when the DB is reset, an old auth cookie can reference a deleted user id.
+// That breaks Account/Manage pages and can hide admin nav checks. Detect and
+// clear stale cookies early so the user can re-authenticate cleanly.
+app.Use(async (context, next) =>
+{
+    if (context.User.Identity?.IsAuthenticated == true)
+    {
+        var userManager = context.RequestServices.GetRequiredService<UserManager<ApplicationUser>>();
+        var user = await userManager.GetUserAsync(context.User);
+        if (user is null)
+        {
+            await context.SignOutAsync(IdentityConstants.ApplicationScheme);
+            var returnUrl = Uri.EscapeDataString(context.Request.Path + context.Request.QueryString);
+            context.Response.Redirect($"/Account/Login?returnUrl={returnUrl}");
+            return;
+        }
+    }
+
+    await next();
+});
+
+// Keep the theme cookie aligned with effective preference on full-page requests.
+// This ensures auth pages (excluded from interactive routing) render with the
+// correct theme on first paint after login/logout/refresh.
+app.Use(async (context, next) =>
+{
+    if (HttpMethods.IsGet(context.Request.Method))
+    {
+        var path = context.Request.Path.Value ?? string.Empty;
+        var isStaticAssetRequest =
+            path.StartsWith("/_framework", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/css", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/js", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/images", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/photos", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/app/default-auth-image", StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith("/user/background-image", StringComparison.OrdinalIgnoreCase);
+
+        if (!isStaticAssetRequest)
+        {
+            var db = context.RequestServices.GetRequiredService<ApplicationDbContext>();
+            var userManager = context.RequestServices.GetRequiredService<UserManager<ApplicationUser>>();
+
+            string? desiredThemeMode = null;
+            if (context.User.Identity?.IsAuthenticated == true)
+            {
+                var user = await userManager.GetUserAsync(context.User);
+                if (user is not null)
+                {
+                    desiredThemeMode = await db.UserSettings
+                        .AsNoTracking()
+                        .Where(x => x.OwnerUserId == user.Id)
+                        .Select(x => x.ThemeMode)
+                        .FirstOrDefaultAsync(context.RequestAborted);
+                }
+            }
+
+            desiredThemeMode ??= await db.AppSettings
+                .AsNoTracking()
+                .OrderByDescending(x => x.UpdatedAtUtc)
+                .ThenByDescending(x => x.Id)
+                .Select(x => x.DefaultThemeMode)
+                .FirstOrDefaultAsync(context.RequestAborted)
+                ?? "system";
+
+            desiredThemeMode = NormalizeThemeMode(desiredThemeMode);
+
+            var currentThemeCookie = context.Request.Cookies["animaltracker_theme"];
+            if (!string.Equals(currentThemeCookie, desiredThemeMode, StringComparison.OrdinalIgnoreCase))
+            {
+                context.Response.Cookies.Append("animaltracker_theme", desiredThemeMode, new CookieOptions
+                {
+                    Path = "/",
+                    SameSite = SameSiteMode.Lax,
+                    HttpOnly = false,
+                    IsEssential = true,
+                    MaxAge = TimeSpan.FromDays(180),
+                    Secure = context.Request.IsHttps
+                });
+            }
+        }
+    }
+
+    await next();
+});
 
 app.UseAntiforgery();
 
@@ -259,6 +348,8 @@ static async Task EnsureSqliteUserSettingsColumnsAsync(ApplicationDbContext db)
 
     await TryAddAsync("BackgroundImageRelativePath", "ALTER TABLE UserSettings ADD COLUMN BackgroundImageRelativePath TEXT NULL");
     await TryAddAsync("ThemeMode", "ALTER TABLE UserSettings ADD COLUMN ThemeMode TEXT NOT NULL DEFAULT 'system'");
+    await TryAddAsync("SurfaceOpacityPercent", "ALTER TABLE UserSettings ADD COLUMN SurfaceOpacityPercent INTEGER NOT NULL DEFAULT 93");
+    await TryAddAsync("DarkSurfaceOpacityPercent", "ALTER TABLE UserSettings ADD COLUMN DarkSurfaceOpacityPercent INTEGER NOT NULL DEFAULT 50");
 }
 
 static async Task EnsureSqliteAppSettingsTableAsync(ApplicationDbContext db)
@@ -308,4 +399,10 @@ static async Task EnsureAdminUserAsync(IServiceProvider sp)
         if (!result.Succeeded)
             throw new InvalidOperationException(string.Join("; ", result.Errors.Select(e => e.Description)));
     }
+}
+
+static string NormalizeThemeMode(string? mode)
+{
+    var normalized = (mode ?? string.Empty).Trim().ToLowerInvariant();
+    return normalized is "light" or "dark" ? normalized : "system";
 }

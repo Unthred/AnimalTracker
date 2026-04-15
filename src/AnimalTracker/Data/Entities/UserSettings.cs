@@ -34,6 +34,16 @@ public sealed class UserSettings
     [Required, MaxLength(16)]
     public string ThemeMode { get; set; } = "system";
 
+    /// <summary>
+    /// Light-mode panel opacity (nav + main content) as an integer percent from 35 to 100.
+    /// </summary>
+    public int SurfaceOpacityPercent { get; set; } = 93;
+
+    /// <summary>
+    /// Dark-mode panel opacity (nav + main content) as an integer percent from 35 to 100.
+    /// </summary>
+    public int DarkSurfaceOpacityPercent { get; set; } = 50;
+
     public DateTime CreatedAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
 }

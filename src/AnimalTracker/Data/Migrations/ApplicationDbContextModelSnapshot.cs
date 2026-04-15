@@ -349,6 +349,12 @@ namespace AnimalTracker.Migrations
                         .HasMaxLength(16)
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("DarkSurfaceOpacityPercent")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("SurfaceOpacityPercent")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("TimelinePageSize")
                         .HasColumnType("INTEGER");
 

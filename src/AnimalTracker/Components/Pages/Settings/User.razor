@@ -1,5 +1,6 @@
 @page "/settings"
 @rendermode InteractiveServer
+@implements IDisposable
 
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize]
@@ -8,6 +9,7 @@
 @using Microsoft.AspNetCore.Components.Forms
 @inject UserSettingsService Settings
 @inject AnimalTracker.State.UserPreferencesState Prefs
+@inject IJSRuntime JS
 
 <PageTitle>Settings</PageTitle>
 
@@ -28,20 +30,29 @@
 }
 
 <UICard Title="User preferences">
-    <EditForm Model="model" OnValidSubmit="SaveAsync" class="space-y-8">
+    <EditForm Model="model" class="space-y-8">
         <DataAnnotationsValidator />
+        @if (!string.IsNullOrWhiteSpace(preferencesMessage))
+        {
+            <p class="text-sm text-slate-600 dark:text-slate-300">@preferencesMessage</p>
+        }
 
         <div class="grid min-w-0 grid-cols-1 gap-8 md:grid-cols-2">
             <UIField Label="Highlight color" For="accent" Hint="Hex format like #22c55e">
                 <div class="flex min-w-0 flex-wrap items-center gap-3 sm:gap-4">
                     <input id="accent" type="color" class="h-11 w-16 shrink-0 cursor-pointer rounded-xl border border-slate-200/90 bg-white p-1 shadow-sm dark:border-slate-700 dark:bg-slate-900"
-                           @bind="model.AccentColorHex" />
-                    <input type="text" class="min-w-0 flex-1 px-3 py-2.5" @bind="model.AccentColorHex" />
+                           @bind="model.AccentColorHex"
+                           @bind:after="OnPreferencesChangedAsync" />
+                    <input type="text" class="min-w-0 flex-1 px-3 py-2.5"
+                           @bind="model.AccentColorHex"
+                           @bind:after="OnPreferencesChangedAsync" />
                 </div>
             </UIField>
 
             <UIField Label="Timeline page size" For="pageSize">
-                <select id="pageSize" class="w-full min-w-0 px-3 py-2.5" @bind="model.TimelinePageSize">
+                <select id="pageSize" class="w-full min-w-0 px-3 py-2.5"
+                        @bind="model.TimelinePageSize"
+                        @bind:after="OnPreferencesChangedAsync">
                     <option value="25">25</option>
                     <option value="50">50</option>
                     <option value="100">100</option>
@@ -50,25 +61,43 @@
         </div>
 
         <UIField Label="Theme" For="themeMode" Hint="Choose Light, Dark, or follow your system setting.">
-            <select id="themeMode" class="w-full max-w-xs min-w-0 px-3 py-2.5" @bind="model.ThemeMode">
+            <select id="themeMode" class="w-full max-w-xs min-w-0 px-3 py-2.5"
+                    @bind="model.ThemeMode"
+                    @bind:after="OnThemeModeChanged">
                 <option value="system">Follow system</option>
                 <option value="light">Light</option>
                 <option value="dark">Dark</option>
             </select>
         </UIField>
 
+        <UIField Label="Panel opacity" For="surfaceOpacity"
+                 Hint="Controls how see-through the sidebar, main panel, and cards are in the active theme mode.">
+            <div class="max-w-xl rounded-xl border border-slate-200/90 bg-white/70 px-4 py-3 shadow-sm dark:border-slate-700 dark:bg-slate-950/40">
+                <div class="flex items-center justify-between gap-3">
+                    <input id="surfaceOpacity"
+                           type="range"
+                           min="35"
+                           max="100"
+                           step="1"
+                           class="h-2 w-full cursor-pointer accent-[var(--accent)]"
+                           @bind="ActiveSurfaceOpacityPercent"
+                           @bind:event="oninput"
+                           @bind:after="OnPreferencesChangedAsync" />
+                    <span class="min-w-12 text-right text-sm font-semibold text-slate-700 dark:text-slate-200">@ActiveSurfaceOpacityPercent%</span>
+                </div>
+            </div>
+        </UIField>
+
         <UIField Label="Compact layout" For="compact"
-                 Hint="After you save: less padding in the main column and inside cards, slightly smaller page titles, and denser rows on Timeline and Animals. Visit Timeline before and after saving to see the clearest difference.">
+                 Hint="Saves automatically: less padding in the main column and inside cards, slightly smaller page titles, and denser rows on Timeline and Animals.">
             <label for="compact"
                    class="flex min-h-[2.75rem] w-full max-w-xl cursor-pointer items-center gap-3 rounded-xl border border-slate-200/90 bg-white px-4 py-2.5 shadow-sm transition duration-200 ease-in-out hover:border-slate-300/90 dark:border-slate-700 dark:bg-slate-950/40 dark:hover:border-slate-600">
-                <InputCheckbox id="compact" class="checkbox-soft size-[1.125rem] shrink-0" @bind-Value="model.CompactMode" />
+                <InputCheckbox id="compact" class="checkbox-soft size-[1.125rem] shrink-0"
+                               @bind-Value="model.CompactMode"
+                               @bind-Value:after="OnPreferencesChangedAsync" />
                 <span class="select-none text-sm font-medium text-slate-800 dark:text-slate-100">Tighter spacing across the app</span>
             </label>
         </UIField>
-
-        <div class="flex justify-stretch border-t border-slate-200/80 pt-6 dark:border-slate-800/80 sm:justify-end">
-            <UIButton Type="submit" Variant="UiButtonVariant.Primary" Class="w-full sm:w-auto">Save preferences</UIButton>
-        </div>
     </EditForm>
 </UICard>
 
@@ -176,6 +205,7 @@
 @code {
     private string? message;
     private string? bgMessage;
+    private string? preferencesMessage;
     private readonly Model model = new();
 
     [Inject] private LocationService LocationService { get; set; } = default!;
@@ -189,6 +219,21 @@
     private string newSpeciesName = "";
 
     private bool hasBackground;
+    private CancellationTokenSource? preferencesSaveCts;
+    private int preferencesSaveVersion;
+    private bool isDarkModeActive;
+
+    private int ActiveSurfaceOpacityPercent
+    {
+        get => isDarkModeActive ? model.DarkSurfaceOpacityPercent : model.SurfaceOpacityPercent;
+        set
+        {
+            if (isDarkModeActive)
+                model.DarkSurfaceOpacityPercent = value;
+            else
+                model.SurfaceOpacityPercent = value;
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -197,13 +242,28 @@
         await ReloadSpeciesAsync();
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Ensure first visit to settings reflects persisted selection.
+            await JS.InvokeVoidAsync("animalTrackerSetTheme", model.ThemeMode);
+        }
+
+        var changed = await RefreshEffectiveThemeModeAsync();
+        if (changed)
+            await InvokeAsync(StateHasChanged);
+    }
+
     private async Task ReloadSettingsModelAsync()
     {
         var s = await Settings.GetOrCreateAsync();
         model.AccentColorHex = s.AccentColorHex;
         model.CompactMode = s.CompactMode;
         model.TimelinePageSize = s.TimelinePageSize;
-        model.ThemeMode = s.ThemeMode;
+        model.ThemeMode = NormalizeThemeMode(s.ThemeMode);
+        model.SurfaceOpacityPercent = s.SurfaceOpacityPercent is < 35 or > 100 ? 93 : s.SurfaceOpacityPercent;
+        model.DarkSurfaceOpacityPercent = s.DarkSurfaceOpacityPercent is < 35 or > 100 ? 50 : s.DarkSurfaceOpacityPercent;
         hasBackground = !string.IsNullOrWhiteSpace(s.BackgroundImageRelativePath);
     }
 
@@ -226,23 +286,135 @@
         speciesLoading = false;
     }
 
-    private async Task SaveAsync()
+    private void OnThemeModeChanged() =>
+        _ = OnThemeModeChangedAsync();
+
+    private async Task OnThemeModeChangedAsync()
     {
-        message = null;
+        model.ThemeMode = NormalizeThemeMode(model.ThemeMode);
+        Prefs.SetThemeMode(model.ThemeMode);
+
         try
         {
-            var saved = await Settings.UpdateAsync(model.AccentColorHex, model.CompactMode, model.TimelinePageSize, model.ThemeMode);
+            isDarkModeActive = await JS.InvokeAsync<bool>("animalTrackerResolveDark", model.ThemeMode);
+            await JS.InvokeVoidAsync("animalTrackerSetTheme", model.ThemeMode);
+        }
+        catch
+        {
+            isDarkModeActive = string.Equals(model.ThemeMode, "dark", StringComparison.OrdinalIgnoreCase);
+        }
+        await SavePreferencesImmediateAsync();
+    }
+
+    private Task OnPreferencesChangedAsync() =>
+        QueuePreferencesSaveAsync();
+
+    private async Task<bool> RefreshEffectiveThemeModeAsync()
+    {
+        bool resolved;
+        try
+        {
+            resolved = await JS.InvokeAsync<bool>("animalTrackerIsDarkActive");
+        }
+        catch
+        {
+            resolved = string.Equals(model.ThemeMode, "dark", StringComparison.OrdinalIgnoreCase);
+        }
+
+        if (resolved == isDarkModeActive)
+            return false;
+
+        isDarkModeActive = resolved;
+        return true;
+    }
+
+    private Task QueuePreferencesSaveAsync()
+    {
+        CancelPendingPreferencesSave();
+        preferencesSaveCts = new CancellationTokenSource();
+        var token = preferencesSaveCts.Token;
+        var version = ++preferencesSaveVersion;
+
+        preferencesMessage = "Saving…";
+        _ = SavePreferencesQueuedAsync(version, token);
+        return Task.CompletedTask;
+    }
+
+    private async Task SavePreferencesImmediateAsync()
+    {
+        CancelPendingPreferencesSave();
+        preferencesMessage = "Saving…";
+        var version = ++preferencesSaveVersion;
+        try
+        {
+            var saved = await Settings.UpdateAsync(
+                model.AccentColorHex,
+                model.CompactMode,
+                model.TimelinePageSize,
+                model.ThemeMode,
+                model.SurfaceOpacityPercent,
+                model.DarkSurfaceOpacityPercent);
+
+            if (version != preferencesSaveVersion)
+                return;
+
             model.AccentColorHex = saved.AccentColorHex;
             model.CompactMode = saved.CompactMode;
             model.TimelinePageSize = saved.TimelinePageSize;
-            model.ThemeMode = saved.ThemeMode;
+            model.ThemeMode = NormalizeThemeMode(saved.ThemeMode);
+            model.SurfaceOpacityPercent = saved.SurfaceOpacityPercent;
+            model.DarkSurfaceOpacityPercent = saved.DarkSurfaceOpacityPercent;
             Prefs.Apply(saved);
             hasBackground = !string.IsNullOrWhiteSpace(saved.BackgroundImageRelativePath);
-            message = "Saved.";
+            preferencesMessage = "Saved.";
         }
         catch (Exception ex)
         {
-            message = $"Error: {ex.Message}";
+            if (version == preferencesSaveVersion)
+                preferencesMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    private async Task SavePreferencesQueuedAsync(int version, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(250, cancellationToken);
+            var saved = await Settings.UpdateAsync(
+                model.AccentColorHex,
+                model.CompactMode,
+                model.TimelinePageSize,
+                model.ThemeMode,
+                model.SurfaceOpacityPercent,
+                model.DarkSurfaceOpacityPercent,
+                cancellationToken);
+
+            if (cancellationToken.IsCancellationRequested || version != preferencesSaveVersion)
+                return;
+
+            model.AccentColorHex = saved.AccentColorHex;
+            model.CompactMode = saved.CompactMode;
+            model.TimelinePageSize = saved.TimelinePageSize;
+            model.ThemeMode = NormalizeThemeMode(saved.ThemeMode);
+            model.SurfaceOpacityPercent = saved.SurfaceOpacityPercent;
+            model.DarkSurfaceOpacityPercent = saved.DarkSurfaceOpacityPercent;
+            Prefs.Apply(saved);
+            hasBackground = !string.IsNullOrWhiteSpace(saved.BackgroundImageRelativePath);
+            preferencesMessage = "Saved.";
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            if (version == preferencesSaveVersion)
+                preferencesMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            if (version == preferencesSaveVersion)
+                await InvokeAsync(StateHasChanged);
         }
     }
 
@@ -358,5 +530,29 @@
 
         [System.ComponentModel.DataAnnotations.Required]
         public string ThemeMode { get; set; } = "system";
+
+        [System.ComponentModel.DataAnnotations.Range(35, 100)]
+        public int SurfaceOpacityPercent { get; set; } = 93;
+
+        [System.ComponentModel.DataAnnotations.Range(35, 100)]
+        public int DarkSurfaceOpacityPercent { get; set; } = 50;
+    }
+
+    private static string NormalizeThemeMode(string? value)
+    {
+        var normalized = (value ?? string.Empty).Trim().ToLowerInvariant();
+        return normalized is "light" or "dark" ? normalized : "system";
+    }
+
+    public void Dispose()
+    {
+        CancelPendingPreferencesSave();
+    }
+
+    private void CancelPendingPreferencesSave()
+    {
+        preferencesSaveCts?.Cancel();
+        preferencesSaveCts?.Dispose();
+        preferencesSaveCts = null;
     }
 }

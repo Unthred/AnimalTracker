@@ -15,6 +15,8 @@ public sealed class UserPreferencesState
 
     /// <summary>"system", "light", or "dark"</summary>
     public string ThemeMode { get; private set; } = "system";
+    public int SurfaceOpacityPercent { get; private set; } = 93;
+    public int DarkSurfaceOpacityPercent { get; private set; } = 50;
 
     /// <summary>Bumps when preferences change so background URL cache-busts.</summary>
     public int UiStamp { get; private set; }
@@ -29,7 +31,19 @@ public sealed class UserPreferencesState
         TimelinePageSize = settings.TimelinePageSize;
         BackgroundImageRelativePath = settings.BackgroundImageRelativePath;
         ThemeMode = string.IsNullOrWhiteSpace(settings.ThemeMode) ? "system" : settings.ThemeMode;
+        SurfaceOpacityPercent = settings.SurfaceOpacityPercent is < 35 or > 100 ? 93 : settings.SurfaceOpacityPercent;
+        DarkSurfaceOpacityPercent = settings.DarkSurfaceOpacityPercent is < 35 or > 100 ? 50 : settings.DarkSurfaceOpacityPercent;
         UiStamp++;
+        Changed?.Invoke();
+    }
+
+    /// <summary>
+    /// Applies theme mode immediately in-memory (used for optimistic UI sync before persistence completes).
+    /// </summary>
+    public void SetThemeMode(string? themeMode)
+    {
+        var normalized = (themeMode ?? "").Trim().ToLowerInvariant();
+        ThemeMode = normalized is "light" or "dark" ? normalized : "system";
         Changed?.Invoke();
     }
 

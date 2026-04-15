@@ -31,13 +31,27 @@ public sealed class UserSettingsService(
             CompactMode = false,
             TimelinePageSize = 50,
             ThemeMode = defaults.DefaultThemeMode,
+            SurfaceOpacityPercent = 93,
+            DarkSurfaceOpacityPercent = 50,
             CreatedAtUtc = now,
             UpdatedAtUtc = now
         };
 
         db.UserSettings.Add(created);
-        await db.SaveChangesAsync(cancellationToken);
-        return created;
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            return created;
+        }
+        catch (DbUpdateException)
+        {
+            // Concurrent first-load requests can race and both attempt INSERT.
+            // If another request won, return the row that now exists.
+            var winner = await db.UserSettings.FirstOrDefaultAsync(x => x.OwnerUserId == userId, cancellationToken);
+            if (winner is not null)
+                return winner;
+            throw;
+        }
     }
 
     public async Task<UserSettings> UpdateAsync(
@@ -45,6 +59,8 @@ public sealed class UserSettingsService(
         bool compactMode,
         int timelinePageSize,
         string themeMode,
+        int surfaceOpacityPercent,
+        int darkSurfaceOpacityPercent,
         CancellationToken cancellationToken = default)
     {
         var settings = await GetOrCreateAsync(cancellationToken);
@@ -60,10 +76,18 @@ public sealed class UserSettingsService(
         if (themeMode is not ("system" or "light" or "dark"))
             throw new ArgumentOutOfRangeException(nameof(themeMode), "Theme mode must be system, light, or dark.");
 
+        if (surfaceOpacityPercent is < 35 or > 100)
+            throw new ArgumentOutOfRangeException(nameof(surfaceOpacityPercent), "Panel opacity must be between 35 and 100.");
+
+        if (darkSurfaceOpacityPercent is < 35 or > 100)
+            throw new ArgumentOutOfRangeException(nameof(darkSurfaceOpacityPercent), "Dark panel opacity must be between 35 and 100.");
+
         settings.AccentColorHex = accentColorHex;
         settings.CompactMode = compactMode;
         settings.TimelinePageSize = timelinePageSize;
         settings.ThemeMode = themeMode;
+        settings.SurfaceOpacityPercent = surfaceOpacityPercent;
+        settings.DarkSurfaceOpacityPercent = darkSurfaceOpacityPercent;
         settings.UpdatedAtUtc = DateTime.UtcNow;
 
         await db.SaveChangesAsync(cancellationToken);

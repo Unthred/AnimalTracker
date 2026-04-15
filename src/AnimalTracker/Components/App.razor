@@ -1,9 +1,6 @@
 ﻿<!DOCTYPE html>
 @inject IHttpContextAccessor HttpContextAccessor
 @{
-    // Enhanced navigation can replace the <html> element from server responses.
-    // If the response doesn't include the `dark` class, the browser will drop it even if JS set it earlier.
-    // We seed the class from the theme cookie so navigation stays visually consistent.
     var themeCookie = HttpContextAccessor.HttpContext?.Request.Cookies["animaltracker_theme"];
     var initialHtmlClass = string.Equals(themeCookie, "dark", StringComparison.OrdinalIgnoreCase) ? "dark" : "";
 }
@@ -13,6 +10,27 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
+    <script>
+        // First-paint theme bootstrap: run before CSS so full page loads
+        // (including /Account pages) start in the correct palette.
+        (() => {
+            try {
+                const readCookie = (name) => {
+                    const prefix = name + '=';
+                    const parts = document.cookie.split(';');
+                    for (const p of parts) {
+                        const s = p.trim();
+                        if (s.startsWith(prefix)) return decodeURIComponent(s.substring(prefix.length));
+                    }
+                    return null;
+                };
+                const mode = (readCookie('animaltracker_theme') || 'system').toLowerCase();
+                const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                const dark = mode === 'dark' || (mode === 'system' && prefersDark);
+                document.documentElement.classList.toggle('dark', !!dark);
+            } catch { /* ignore */ }
+        })();
+    </script>
     <ResourcePreloader />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -52,17 +70,77 @@
                 document.cookie = `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${180 * 24 * 60 * 60}; SameSite=Lax`;
             } catch { /* ignore */ }
         };
-        window.animalTrackerSetTheme = (mode) => {
+        window.animalTrackerResolveDark = (mode) => {
             try {
                 const m = (mode || 'system').toLowerCase();
-                const root = document.documentElement;
                 const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-                const dark = (m === 'dark') || (m === 'system' && prefersDark);
+                return (m === 'dark') || (m === 'system' && prefersDark);
+            } catch {
+                return false;
+            }
+        };
+        window.animalTrackerIsDarkActive = () => {
+            try {
+                return !!document.documentElement.classList.contains('dark');
+            } catch {
+                return false;
+            }
+        };
+        window.animalTrackerSetTheme = (mode) => {
+            try {
+                const root = document.documentElement;
+                const m = (mode || 'system').toLowerCase();
+                const dark = window.animalTrackerResolveDark(m);
                 root.classList.toggle('dark', !!dark);
                 // Persist so full-page navigations keep the same theme.
                 animalTrackerWriteCookie(animalTrackerThemeCookieName, m);
             } catch { /* ignore */ }
         };
+        window.animalTrackerGetThemeCookie = () => {
+            try {
+                return animalTrackerReadCookie(animalTrackerThemeCookieName);
+            } catch {
+                return null;
+            }
+        };
+        window.animalTrackerGetDebugDrawerOpen = () => {
+            try {
+                return localStorage.getItem('animaltracker_theme_debug_open') === '1';
+            } catch {
+                return false;
+            }
+        };
+        window.animalTrackerSetDebugDrawerOpen = (open) => {
+            try {
+                localStorage.setItem('animaltracker_theme_debug_open', open ? '1' : '0');
+            } catch { /* ignore */ }
+        };
+        window.animalTrackerEnsureTheme = () => {
+            try {
+                const mode = (window.animalTrackerGetThemeCookie() || 'system').toLowerCase();
+                const shouldBeDark = window.animalTrackerResolveDark(mode);
+                const root = document.documentElement;
+                if (!!root.classList.contains('dark') !== !!shouldBeDark) {
+                    root.classList.toggle('dark', !!shouldBeDark);
+                }
+            } catch { /* ignore */ }
+        };
+
+        // Keep theme stable across enhanced navigation DOM swaps.
+        try {
+            document.addEventListener('enhancedload', () => {
+                window.animalTrackerEnsureTheme();
+            });
+        } catch { /* ignore */ }
+
+        try {
+            const root = document.documentElement;
+            const classObserver = new MutationObserver(() => {
+                window.animalTrackerEnsureTheme();
+            });
+            classObserver.observe(root, { attributes: true, attributeFilter: ['class'] });
+        } catch { /* ignore */ }
+
         // Apply immediately from cookie to avoid a flash of wrong theme on full reloads.
         window.animalTrackerSetTheme(animalTrackerReadCookie(animalTrackerThemeCookieName) || 'system');
     </script>

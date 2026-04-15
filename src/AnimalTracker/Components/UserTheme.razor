@@ -1,4 +1,5 @@
 @using AnimalTracker.Services
+@using System.Globalization
 @using Microsoft.AspNetCore.Components.Authorization
 @rendermode InteractiveServer
 @implements IDisposable
@@ -6,88 +7,353 @@
 @inject UserSettingsService Settings
 @inject AppSettingsService AppSettings
 @inject AuthenticationStateProvider AuthStateProvider
+@inject CurrentUserService CurrentUser
 @inject AnimalTracker.State.UserPreferencesState Prefs
 @inject IJSRuntime JS
+@inject NavigationManager Navigation
 
 @if (!string.IsNullOrWhiteSpace(accent))
 {
     <style>
-        :root { --accent: @accent; }
+        :root { --accent: @accent; --surface-opacity-light: @lightSurfaceOpacity; --surface-opacity-dark: @darkSurfaceOpacity; }
     </style>
 }
+
+<div style="position:fixed; right:0; top:50%; transform:translateY(-50%); z-index:1200; display:flex; align-items:stretch;">
+    <button type="button"
+            @onclick="ToggleDebugDrawer"
+            style="writing-mode:vertical-rl; transform:rotate(180deg); border:1px solid rgb(51 65 85 / 0.95); border-right:none; border-radius:0.5rem 0 0 0.5rem; background:rgb(15 23 42 / 0.96); color:rgb(226 232 240 / 1); padding:0.5rem 0.35rem; font-size:11px; letter-spacing:0.04em;">
+        Theme debug
+    </button>
+    <div style="@DebugDrawerStyle">
+        <div class="mb-1 text-sm font-semibold" style="color:rgb(248 250 252 / 1);">Theme debug</div>
+        <div class="grid grid-cols-[auto,1fr] gap-x-2 gap-y-1 font-mono text-xs leading-5">
+            <span style="color:rgb(148 163 184 / 1);">path</span><span style="overflow-wrap:anywhere;">@debugPath</span>
+            <span style="color:rgb(148 163 184 / 1);">auth</span><span>@(debugIsAuthenticated ? "yes" : "no")</span>
+            <span style="color:rgb(148 163 184 / 1);">userId</span><span style="overflow-wrap:anywhere;">@debugUserId</span>
+            <span style="color:rgb(148 163 184 / 1);">desired</span><span>@debugDesiredThemeMode</span>
+            <span style="color:rgb(148 163 184 / 1);">prefs</span><span>@debugPrefsThemeMode</span>
+            <span style="color:rgb(148 163 184 / 1);">appDefault</span><span>@debugAppDefaultThemeMode</span>
+            <span style="color:rgb(148 163 184 / 1);">cookie</span><span>@debugCookieThemeMode</span>
+            <span style="color:rgb(148 163 184 / 1);">desiredDark</span><span>@BoolText(debugDesiredDark)</span>
+            <span style="color:rgb(148 163 184 / 1);">activeDark</span><span>@BoolText(debugActiveDark)</span>
+            <span style="color:rgb(148 163 184 / 1);">lastApplied</span><span>@(lastAppliedThemeMode ?? "(null)")</span>
+            <span style="color:rgb(148 163 184 / 1);">updated</span><span>@debugUpdatedAtLocal</span>
+            <span style="color:rgb(148 163 184 / 1);">error</span><span style="overflow-wrap:anywhere;">@debugError</span>
+        </div>
+    </div>
+</div>
 
 @code
 {
     private string? accent;
+    private string lightSurfaceOpacity = "0.93";
+    private string darkSurfaceOpacity = "0.5";
     private string? lastAppliedThemeMode;
     private string? lastAppliedUserId;
-    private string themeModeOverride = "system";
+    private string appDefaultThemeMode = "system";
+    private bool appDefaultLoaded;
+    private bool waitingForAuthenticatedUser;
+    private int authProbeAttempts;
+    private bool authProbeScheduled;
+    private readonly CancellationTokenSource authProbeCts = new();
+    private string debugPath = "/";
+    private bool debugIsAuthenticated;
+    private string debugUserId = "(anonymous)";
+    private string debugDesiredThemeMode = "system";
+    private string debugPrefsThemeMode = "system";
+    private string debugAppDefaultThemeMode = "system";
+    private string debugCookieThemeMode = "(unknown)";
+    private bool? debugDesiredDark;
+    private bool? debugActiveDark;
+    private string debugUpdatedAtLocal = "--";
+    private string debugError = "(none)";
+    private bool debugDrawerOpen;
 
-    protected override async Task OnInitializedAsync()
+    private string DebugDrawerStyle =>
+        string.Join(' ', new[]
+        {
+            "border:1px solid rgb(51 65 85 / 0.95);",
+            "border-right:none;",
+            "border-radius:0.5rem 0 0 0.5rem;",
+            "background:rgb(2 6 23 / 0.95);",
+            "color:rgb(226 232 240 / 1);",
+            "padding:0.75rem;",
+            "width:min(30rem, calc(100vw - 3.5rem));",
+            "max-height:60vh;",
+            "overflow:auto;",
+            "box-shadow:0 20px 45px rgb(15 23 42 / 0.5);",
+            debugDrawerOpen ? "display:block;" : "display:none;"
+        });
+
+    protected override Task OnInitializedAsync()
     {
         Prefs.Changed += OnPrefsChanged;
         AuthStateProvider.AuthenticationStateChanged += OnAuthenticationStateChanged;
-        await RefreshFromAuthenticationStateAsync(await AuthStateProvider.GetAuthenticationStateAsync());
+        Navigation.LocationChanged += OnLocationChanged;
+        // Keep CSS vars initialized even before user preferences are loaded.
+        accent = Prefs.AccentColorHex;
+        lightSurfaceOpacity = ToOpacityDecimal(Prefs.SurfaceOpacityPercent, minPercent: 35, fallbackPercent: 93);
+        darkSurfaceOpacity = ToOpacityDecimal(Prefs.DarkSurfaceOpacityPercent, minPercent: 35, fallbackPercent: 50);
+        return Task.CompletedTask;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        // JS interop is only valid after interactive render begins (not during prerender).
-        // Re-apply theme on navigation/rerenders if needed.
-        var desiredThemeMode = string.IsNullOrWhiteSpace(themeModeOverride) ? Prefs.ThemeMode : themeModeOverride;
-        if (lastAppliedThemeMode != desiredThemeMode)
+        if (firstRender)
         {
-            await ApplyThemeAsync(desiredThemeMode);
-            lastAppliedThemeMode = desiredThemeMode;
+            try
+            {
+                debugDrawerOpen = await JS.InvokeAsync<bool>("animalTrackerGetDebugDrawerOpen");
+            }
+            catch
+            {
+                debugDrawerOpen = false;
+            }
+        }
+
+        var changed = await EnsureThemeIsSynchronizedAsync();
+        if (changed)
+            StateHasChanged();
+
+        // On hard refresh/redeploy, auth can hydrate slightly after first interactive render.
+        // Probe briefly so we still apply per-user theme even if AuthenticationStateChanged is missed/delayed.
+        if (waitingForAuthenticatedUser && authProbeAttempts < 12 && !authProbeScheduled)
+        {
+            authProbeScheduled = true;
+            authProbeAttempts++;
+            _ = ScheduleAuthProbeAsync(authProbeCts.Token);
+        }
+    }
+
+    private async Task<bool> EnsureThemeIsSynchronizedAsync()
+    {
+        // TODO(theme-refresh): In local dev we still see occasional F5 theme inversion on Settings
+        // (dropdown reflects current preference, but rendered palette can lag one theme behind until navigation).
+        // This method intentionally centralizes all theme re-application logic so we have one place to add
+        // deeper diagnostics / eventual final fix without scattering behavior across components.
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        string desiredThemeMode;
+
+        string resolvedUserId = "(anonymous)";
+        var isAuthenticated = auth.User.Identity?.IsAuthenticated == true;
+        if (!isAuthenticated)
+        {
+            lastAppliedUserId = null;
+            waitingForAuthenticatedUser = true;
+
+            if (!appDefaultLoaded)
+            {
+                var appDefaults = await AppSettings.GetOrCreateAsync();
+                appDefaultThemeMode = NormalizeThemeMode(appDefaults.DefaultThemeMode);
+                appDefaultLoaded = true;
+            }
+
+            desiredThemeMode = appDefaultThemeMode;
+        }
+        else
+        {
+            waitingForAuthenticatedUser = false;
+            authProbeAttempts = 0;
+            var userId = await ResolveCurrentUserIdAsync(auth);
+            resolvedUserId = userId;
+            if (!string.Equals(lastAppliedUserId, userId, StringComparison.Ordinal))
+            {
+                var s = await Settings.GetOrCreateAsync();
+                Prefs.Apply(s);
+                accent = Prefs.AccentColorHex;
+                lightSurfaceOpacity = ToOpacityDecimal(Prefs.SurfaceOpacityPercent, minPercent: 35, fallbackPercent: 93);
+                darkSurfaceOpacity = ToOpacityDecimal(Prefs.DarkSurfaceOpacityPercent, minPercent: 35, fallbackPercent: 50);
+                lastAppliedUserId = userId;
+            }
+
+            desiredThemeMode = NormalizeThemeMode(Prefs.ThemeMode);
+        }
+
+        var isThemeOutOfSync = await IsThemeOutOfSyncAsync(desiredThemeMode);
+        await RefreshDebugStateAsync(isAuthenticated, resolvedUserId, desiredThemeMode);
+        if (lastAppliedThemeMode == desiredThemeMode && !isThemeOutOfSync)
+            return false;
+
+        // JS interop is only valid after interactive render begins (not during prerender).
+        await ApplyThemeAsync(desiredThemeMode);
+        lastAppliedThemeMode = desiredThemeMode;
+        return true;
+    }
+
+    private async Task<bool> IsThemeOutOfSyncAsync(string desiredThemeMode)
+    {
+        try
+        {
+            var desiredDark = await JS.InvokeAsync<bool>("animalTrackerResolveDark", desiredThemeMode);
+            var activeDark = await JS.InvokeAsync<bool>("animalTrackerIsDarkActive");
+            return desiredDark != activeDark;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private async Task ScheduleAuthProbeAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(500, cancellationToken);
+            if (!cancellationToken.IsCancellationRequested)
+            {
+                await InvokeAsync(() =>
+                {
+                    authProbeScheduled = false;
+                    StateHasChanged();
+                });
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // no-op
         }
     }
 
     private void OnPrefsChanged()
     {
         accent = Prefs.AccentColorHex;
+        lightSurfaceOpacity = ToOpacityDecimal(Prefs.SurfaceOpacityPercent, minPercent: 35, fallbackPercent: 93);
+        darkSurfaceOpacity = ToOpacityDecimal(Prefs.DarkSurfaceOpacityPercent, minPercent: 35, fallbackPercent: 50);
         _ = InvokeAsync(StateHasChanged);
     }
 
     private void OnAuthenticationStateChanged(Task<AuthenticationState> authTask) =>
         _ = InvokeAsync(async () =>
         {
-            var auth = await authTask;
-            await RefreshFromAuthenticationStateAsync(auth);
-            StateHasChanged();
+            await authTask;
+            var changed = await EnsureThemeIsSynchronizedAsync();
+            if (changed)
+                StateHasChanged();
         });
 
-    private async Task RefreshFromAuthenticationStateAsync(AuthenticationState auth)
-    {
-        if (auth.User.Identity?.IsAuthenticated != true)
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e) =>
+        _ = InvokeAsync(async () =>
         {
-            lastAppliedUserId = null;
-            var appDefaults = await AppSettings.GetOrCreateAsync();
-            themeModeOverride = string.IsNullOrWhiteSpace(appDefaults.DefaultThemeMode) ? "system" : appDefaults.DefaultThemeMode;
-            return;
+            var changed = await EnsureThemeIsSynchronizedAsync();
+            if (changed)
+                StateHasChanged();
+            else
+                await InvokeAsync(StateHasChanged);
+        });
+
+    private async Task<string> ResolveCurrentUserIdAsync(AuthenticationState auth)
+    {
+        try
+        {
+            return await CurrentUser.GetRequiredUserIdAsync();
         }
+        catch
+        {
+            return auth.User.FindFirst("sub")?.Value
+                ?? auth.User.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")?.Value
+                ?? auth.User.Identity?.Name
+                ?? "__authenticated__";
+        }
+    }
 
-        var userId = auth.User.FindFirst("sub")?.Value
-            ?? auth.User.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")?.Value
-            ?? auth.User.Identity?.Name
-            ?? "__authenticated__";
+    private static string NormalizeThemeMode(string? themeMode)
+    {
+        var normalized = (themeMode ?? "").Trim().ToLowerInvariant();
+        return normalized is "light" or "dark" ? normalized : "system";
+    }
 
-        if (string.Equals(lastAppliedUserId, userId, StringComparison.Ordinal))
-            return;
-
-        var s = await Settings.GetOrCreateAsync();
-        Prefs.Apply(s);
-        accent = Prefs.AccentColorHex;
-        lastAppliedUserId = userId;
-        themeModeOverride = "";
+    private static string ToOpacityDecimal(int percent, int minPercent, int fallbackPercent)
+    {
+        var normalized = percent < minPercent || percent > 100 ? fallbackPercent : percent;
+        var clampedPercent = Math.Clamp(normalized, minPercent, 100);
+        var opacity = clampedPercent / 100d;
+        return opacity.ToString("0.##", CultureInfo.InvariantCulture);
     }
 
     private ValueTask ApplyThemeAsync(string themeMode) =>
         JS.InvokeVoidAsync("animalTrackerSetTheme", themeMode);
 
+    private async Task RefreshDebugStateAsync(bool isAuthenticated, string resolvedUserId, string desiredThemeMode)
+    {
+        try
+        {
+            var uri = Navigation?.Uri ?? "/";
+            var relativePath = Navigation?.ToBaseRelativePath(uri) ?? string.Empty;
+            debugPath = "/" + relativePath;
+            debugIsAuthenticated = isAuthenticated;
+            debugUserId = string.IsNullOrWhiteSpace(resolvedUserId) ? "(unknown)" : resolvedUserId;
+            debugDesiredThemeMode = NormalizeThemeMode(desiredThemeMode);
+            debugPrefsThemeMode = NormalizeThemeMode(Prefs?.ThemeMode);
+            debugAppDefaultThemeMode = NormalizeThemeMode(appDefaultThemeMode);
+
+            try
+            {
+                debugCookieThemeMode = NormalizeThemeMode(await JS.InvokeAsync<string?>("animalTrackerGetThemeCookie"));
+            }
+            catch
+            {
+                debugCookieThemeMode = "(unavailable)";
+            }
+
+            try
+            {
+                debugDesiredDark = await JS.InvokeAsync<bool>("animalTrackerResolveDark", desiredThemeMode);
+            }
+            catch
+            {
+                debugDesiredDark = null;
+            }
+
+            try
+            {
+                debugActiveDark = await JS.InvokeAsync<bool>("animalTrackerIsDarkActive");
+            }
+            catch
+            {
+                debugActiveDark = null;
+            }
+
+            debugError = "(none)";
+            debugUpdatedAtLocal = DateTime.Now.ToString("HH:mm:ss.fff", CultureInfo.InvariantCulture);
+        }
+        catch (Exception ex)
+        {
+            debugError = ex.GetType().Name + ": " + ex.Message;
+            debugUpdatedAtLocal = DateTime.Now.ToString("HH:mm:ss.fff", CultureInfo.InvariantCulture);
+        }
+    }
+
+    private static string BoolText(bool? value) =>
+        value.HasValue ? (value.Value ? "true" : "false") : "(n/a)";
+
+    private async Task ToggleDebugDrawer()
+    {
+        debugDrawerOpen = !debugDrawerOpen;
+        try
+        {
+            await JS.InvokeVoidAsync("animalTrackerSetDebugDrawerOpen", debugDrawerOpen);
+        }
+        catch
+        {
+            // no-op
+        }
+    }
+
     public void Dispose()
     {
-        Prefs.Changed -= OnPrefsChanged;
-        AuthStateProvider.AuthenticationStateChanged -= OnAuthenticationStateChanged;
+        try
+        {
+            Prefs.Changed -= OnPrefsChanged;
+            AuthStateProvider.AuthenticationStateChanged -= OnAuthenticationStateChanged;
+            Navigation.LocationChanged -= OnLocationChanged;
+            authProbeCts.Cancel();
+            authProbeCts.Dispose();
+        }
+        catch
+        {
+            // Hot-reload teardown can dispose partially initialized component instances.
+        }
     }
 }
 

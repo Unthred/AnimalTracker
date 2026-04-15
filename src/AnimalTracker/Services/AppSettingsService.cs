@@ -9,9 +9,25 @@ public sealed class AppSettingsService(ApplicationDbContext db, PhotoStorageServ
 {
     public async Task<AppSettings> GetOrCreateAsync(CancellationToken cancellationToken = default)
     {
-        var existing = await db.AppSettings.FirstOrDefaultAsync(cancellationToken);
+        var existing = await db.AppSettings
+            .OrderByDescending(x => x.UpdatedAtUtc)
+            .ThenByDescending(x => x.Id)
+            .FirstOrDefaultAsync(cancellationToken);
         if (existing is not null)
+        {
+            // Defensive cleanup: local/dev race conditions previously allowed
+            // multiple rows. Keep the most recently updated row as canonical.
+            var duplicateRows = await db.AppSettings
+                .Where(x => x.Id != existing.Id)
+                .ToListAsync(cancellationToken);
+            if (duplicateRows.Count > 0)
+            {
+                db.AppSettings.RemoveRange(duplicateRows);
+                await db.SaveChangesAsync(cancellationToken);
+            }
+
             return existing;
+        }
 
         var now = DateTime.UtcNow;
         var created = new AppSettings
@@ -22,8 +38,24 @@ public sealed class AppSettingsService(ApplicationDbContext db, PhotoStorageServ
         };
 
         db.AppSettings.Add(created);
-        await db.SaveChangesAsync(cancellationToken);
-        return created;
+
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            return created;
+        }
+        catch (DbUpdateException)
+        {
+            // Another request created settings concurrently; read canonical row.
+            db.Entry(created).State = EntityState.Detached;
+            var canonical = await db.AppSettings
+                .OrderByDescending(x => x.UpdatedAtUtc)
+                .ThenByDescending(x => x.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (canonical is null)
+                throw;
+            return canonical;
+        }
     }
 
     public async Task<AppSettings> UpdateThemeModeAsync(string defaultThemeMode, CancellationToken cancellationToken = default)

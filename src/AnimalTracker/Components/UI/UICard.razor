@@ -41,8 +41,7 @@
 
     private string ComputedClass => string.Join(' ', new[]
     {
-        "overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-card",
-        "dark:border-slate-800/80 dark:bg-slate-900/50 dark:shadow-none",
+        "app-surface overflow-hidden rounded-2xl border shadow-card dark:shadow-none",
         Class
     }.Where(s => !string.IsNullOrWhiteSpace(s)));
 }

@@ -3,12 +3,13 @@
 @rendermode InteractiveServer
 
 @using Microsoft.AspNetCore.Authorization
-@attribute [Authorize(Roles = AnimalTracker.Services.AdminUserService.AdminRoleName)]
+@attribute [Authorize]
 
 @using AnimalTracker.Services
 @using Microsoft.AspNetCore.Components.Forms
 @inject AdminUserService AdminUsers
 @inject AppSettingsService AppSettings
+@inject NavigationManager NavigationManager
 
 <PageTitle>Admin</PageTitle>
 
@@ -108,7 +109,16 @@
     private long authImageStamp;
     private readonly Model model = new();
 
-    protected override async Task OnInitializedAsync() => await ReloadAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        if (!await AdminUsers.IsCurrentUserAdminAsync())
+        {
+            NavigationManager.NavigateTo($"/Account/AccessDenied?ReturnUrl={Uri.EscapeDataString("/admin")}", forceLoad: true);
+            return;
+        }
+
+        await ReloadAsync();
+    }
 
     private async Task ReloadAsync()
     {

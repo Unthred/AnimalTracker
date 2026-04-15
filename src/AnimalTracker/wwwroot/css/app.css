@@ -8,6 +8,8 @@
     color-scheme: light;
 
     --accent: #0f172a;
+    --surface-opacity-light: 0.93;
+    --surface-opacity-dark: 0.5;
   }
 
   html.dark {
@@ -83,17 +85,27 @@
     background-color: color-mix(in srgb, var(--accent) 18%, transparent);
   }
 
+  .app-surface {
+    border-color: rgb(226 232 240 / 0.7); /* slate-200/70 */
+    background-color: rgb(255 255 255 / var(--surface-opacity-light, 0.93));
+  }
+
+  html.dark .app-surface {
+    border-color: rgb(30 41 59 / 0.8); /* slate-800/80 */
+    background-color: rgb(15 23 42 / var(--surface-opacity-dark, 0.5)); /* slate-900/50 default */
+  }
+
   .app-nav-link {
     @apply block rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 transition duration-200 ease-in-out dark:text-slate-200;
     text-decoration: none;
   }
 
   .app-nav-link:hover {
-    background-color: color-mix(in srgb, var(--accent) 8%, transparent);
+    background-color: color-mix(in srgb, var(--accent) 14%, white);
   }
 
   .app-nav-link.active {
-    background-color: color-mix(in srgb, var(--accent) 12%, transparent);
+    background-color: color-mix(in srgb, var(--accent) 22%, white);
     color: var(--accent);
     font-weight: 700;
   }
@@ -105,11 +117,11 @@
   }
 
   .app-nav-sublink:hover {
-    background-color: color-mix(in srgb, var(--accent) 8%, transparent);
+    background-color: color-mix(in srgb, var(--accent) 14%, white);
   }
 
   .app-nav-sublink.active {
-    background-color: color-mix(in srgb, var(--accent) 12%, transparent);
+    background-color: color-mix(in srgb, var(--accent) 22%, white);
     color: var(--accent);
     font-weight: 700;
   }

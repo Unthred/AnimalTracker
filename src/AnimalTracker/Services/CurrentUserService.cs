@@ -1,11 +1,23 @@
 using System.Security.Claims;
+using AnimalTracker.Data;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 
 namespace AnimalTracker.Services;
 
-public sealed class CurrentUserService(AuthenticationStateProvider authStateProvider, IHttpContextAccessor httpContextAccessor)
+public sealed class CurrentUserService(
+    AuthenticationStateProvider authStateProvider,
+    IHttpContextAccessor httpContextAccessor,
+    UserManager<ApplicationUser> userManager)
 {
+    private static readonly string[] UserIdClaimTypes =
+    [
+        ClaimTypes.NameIdentifier,
+        "sub",
+        "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"
+    ];
+
     public async Task<string> GetRequiredUserIdAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -18,7 +30,11 @@ public sealed class CurrentUserService(AuthenticationStateProvider authStateProv
         var httpUser = httpContextAccessor.HttpContext?.User;
         if (httpUser?.Identity?.IsAuthenticated == true)
         {
-            var id = httpUser.FindFirstValue(ClaimTypes.NameIdentifier);
+            var resolved = await ResolveUserIdFromPrincipalAsync(httpUser);
+            if (!string.IsNullOrWhiteSpace(resolved))
+                return resolved;
+
+            var id = FindFirstClaimValue(httpUser, UserIdClaimTypes);
             if (!string.IsNullOrEmpty(id))
                 return id;
         }
@@ -28,7 +44,48 @@ public sealed class CurrentUserService(AuthenticationStateProvider authStateProv
         if (user.Identity?.IsAuthenticated != true)
             throw new InvalidOperationException("User must be authenticated.");
 
-        return user.FindFirstValue(ClaimTypes.NameIdentifier)
-            ?? throw new InvalidOperationException("Authenticated user has no NameIdentifier claim.");
+        var resolvedFromAuthState = await ResolveUserIdFromPrincipalAsync(user);
+        if (!string.IsNullOrWhiteSpace(resolvedFromAuthState))
+            return resolvedFromAuthState;
+
+        return FindFirstClaimValue(user, UserIdClaimTypes)
+            ?? throw new InvalidOperationException("Authenticated user has no resolvable user id claim.");
+    }
+
+    private static string? FindFirstClaimValue(ClaimsPrincipal principal, IEnumerable<string> claimTypes)
+    {
+        foreach (var claimType in claimTypes)
+        {
+            var value = principal.FindFirstValue(claimType);
+            if (!string.IsNullOrWhiteSpace(value))
+                return value;
+        }
+
+        return null;
+    }
+
+    private async Task<string?> ResolveUserIdFromPrincipalAsync(ClaimsPrincipal principal)
+    {
+        var user = await userManager.GetUserAsync(principal);
+        if (user is not null)
+            return user.Id;
+
+        var email = principal.FindFirstValue(ClaimTypes.Email) ?? principal.Identity?.Name;
+        if (!string.IsNullOrWhiteSpace(email))
+        {
+            user = await userManager.FindByEmailAsync(email);
+            if (user is not null)
+                return user.Id;
+        }
+
+        var name = principal.Identity?.Name;
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            user = await userManager.FindByNameAsync(name);
+            if (user is not null)
+                return user.Id;
+        }
+
+        return null;
     }
 }

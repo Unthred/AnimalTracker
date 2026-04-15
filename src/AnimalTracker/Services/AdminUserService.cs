@@ -1,5 +1,8 @@
+using System.Security.Claims;
 using System.Security.Cryptography;
 using AnimalTracker.Data;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,7 +17,9 @@ public sealed record AdminUserRow(
 
 public sealed class AdminUserService(
     UserManager<ApplicationUser> userManager,
-    RoleManager<IdentityRole> roleManager)
+    RoleManager<IdentityRole> roleManager,
+    CurrentUserService currentUser,
+    AuthenticationStateProvider authStateProvider)
 {
     public const string AdminRoleName = "Admin";
 
@@ -26,6 +31,41 @@ public sealed class AdminUserService(
         var result = await roleManager.CreateAsync(new IdentityRole(AdminRoleName));
         if (!result.Succeeded)
             throw new InvalidOperationException(string.Join("; ", result.Errors.Select(e => e.Description)));
+    }
+
+    public async Task<bool> IsCurrentUserAdminAsync(CancellationToken cancellationToken = default)
+    {
+        ApplicationUser? user = null;
+
+        try
+        {
+            var userId = await currentUser.GetRequiredUserIdAsync(cancellationToken);
+            user = await userManager.FindByIdAsync(userId);
+        }
+        catch (InvalidOperationException)
+        {
+            // Fall back to principal name/email resolution when id claims are absent.
+        }
+
+        if (user is null)
+        {
+            var authState = await authStateProvider.GetAuthenticationStateAsync();
+            var principal = authState.User;
+            if (principal.Identity?.IsAuthenticated == true)
+            {
+                var email = principal.FindFirstValue(ClaimTypes.Email) ?? principal.Identity.Name;
+                if (!string.IsNullOrWhiteSpace(email))
+                    user = await userManager.FindByEmailAsync(email);
+
+                if (user is null && !string.IsNullOrWhiteSpace(principal.Identity?.Name))
+                    user = await userManager.FindByNameAsync(principal.Identity.Name);
+            }
+        }
+
+        if (user is null)
+            return false;
+
+        return await userManager.IsInRoleAsync(user, AdminRoleName);
     }
 
     public async Task<List<AdminUserRow>> ListUsersAsync(CancellationToken cancellationToken = default)
