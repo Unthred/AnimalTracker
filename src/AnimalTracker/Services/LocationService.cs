@@ -71,6 +71,7 @@ public sealed class LocationService(ApplicationDbContext db, CurrentUserService 
             .ToListAsync(cancellationToken);
 
         if (owned.Count <= 1)
+            // Enforces an invariant used throughout the app: every user always has at least one location.
             throw new InvalidOperationException("You need at least one location.");
 
         var remove = owned.FirstOrDefault(x => x.Id == id)
@@ -78,6 +79,7 @@ public sealed class LocationService(ApplicationDbContext db, CurrentUserService 
 
         var replacement = owned.First(x => x.Id != id);
 
+        // Preserve historical sightings by re-homing them instead of deleting.
         await db.Sightings
             .Where(s => s.OwnerUserId == userId && s.LocationId == id)
             .ExecuteUpdateAsync(

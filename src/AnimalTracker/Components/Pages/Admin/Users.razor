@@ -1,0 +1,139 @@
+@page "/admin/users"
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = AnimalTracker.Services.AdminUserService.AdminRoleName)]
+
+@using AnimalTracker.Services
+@inject AdminUserService AdminUsers
+
+<PageTitle>Admin - Users</PageTitle>
+
+<UIPageHeader Title="Admin · Users" Description="Manage accounts: lock, unlock, reset password, or delete." />
+
+@if (!string.IsNullOrWhiteSpace(message))
+{
+    <UIAlert Variant="@(message.StartsWith("Error", StringComparison.OrdinalIgnoreCase) ? UiAlertVariant.Danger : UiAlertVariant.Success)" Class="mb-6">
+        @message
+    </UIAlert>
+}
+
+<UICard Title="All users" BodyPadding="false">
+    @if (loading)
+    {
+        <div class="p-6 text-sm text-slate-600 dark:text-slate-400">Loading…</div>
+    }
+    else
+    {
+        <ul class="divide-y divide-slate-200/80 dark:divide-slate-800/80">
+            @foreach (var u in users)
+            {
+                <li class="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                    <div class="min-w-0">
+                        <div class="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">@u.Email</div>
+                        <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                            @if (u.IsAdmin)
+                            {
+                                <span class="mr-2 inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-800 dark:bg-slate-800 dark:text-slate-100">Admin</span>
+                            }
+                            <span class="mr-2">Confirmed: @(u.EmailConfirmed ? "Yes" : "No")</span>
+                            <span>Locked: @(u.IsLockedOut ? "Yes" : "No")</span>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+                        @if (u.IsLockedOut)
+                        {
+                            <UIButton Variant="UiButtonVariant.Outline" Size="UiButtonSize.Sm" Class="w-full sm:w-auto" @onclick="() => UnlockAsync(u.Id)">Unlock</UIButton>
+                        }
+                        else
+                        {
+                            <UIButton Variant="UiButtonVariant.Outline" Size="UiButtonSize.Sm" Class="w-full sm:w-auto" @onclick="() => LockAsync(u.Id)">Lock</UIButton>
+                        }
+
+                        <UIButton Variant="UiButtonVariant.Outline" Size="UiButtonSize.Sm" Class="w-full sm:w-auto" @onclick="() => ResetPasswordAsync(u.Id)">Reset password</UIButton>
+
+                        <UIButton Variant="UiButtonVariant.Danger" Size="UiButtonSize.Sm" Class="w-full sm:w-auto" Disabled="@(u.IsAdmin)" title="@(u.IsAdmin ? "Don't delete admin users." : "")"
+                                  @onclick="() => DeleteAsync(u.Id)">Delete</UIButton>
+                    </div>
+                </li>
+            }
+        </ul>
+    }
+</UICard>
+
+@code {
+    private bool loading = true;
+    private string? message;
+    private List<AdminUserRow> users = [];
+
+    protected override async Task OnInitializedAsync() => await ReloadAsync();
+
+    private async Task ReloadAsync()
+    {
+        loading = true;
+        users = await AdminUsers.ListUsersAsync();
+        loading = false;
+    }
+
+    private async Task LockAsync(string userId)
+    {
+        message = null;
+        try
+        {
+            await AdminUsers.LockUserAsync(userId);
+            await ReloadAsync();
+            message = "User locked.";
+        }
+        catch (Exception ex)
+        {
+            message = $"Error: {ex.Message}";
+        }
+    }
+
+    private async Task UnlockAsync(string userId)
+    {
+        message = null;
+        try
+        {
+            await AdminUsers.UnlockUserAsync(userId);
+            await ReloadAsync();
+            message = "User unlocked.";
+        }
+        catch (Exception ex)
+        {
+            message = $"Error: {ex.Message}";
+        }
+    }
+
+    private async Task ResetPasswordAsync(string userId)
+    {
+        message = null;
+        try
+        {
+            var pw = await AdminUsers.ResetPasswordAsync(userId);
+            await ReloadAsync();
+            message = $"Temporary password: {pw}";
+        }
+        catch (Exception ex)
+        {
+            message = $"Error: {ex.Message}";
+        }
+    }
+
+    private async Task DeleteAsync(string userId)
+    {
+        message = null;
+        try
+        {
+            await AdminUsers.DeleteUserAsync(userId);
+            await ReloadAsync();
+            message = "User deleted.";
+        }
+        catch (Exception ex)
+        {
+            message = $"Error: {ex.Message}";
+        }
+    }
+}
+

@@ -10,7 +10,11 @@ public sealed class CurrentUserService(AuthenticationStateProvider authStateProv
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Minimal APIs, <img src="...">, and other HTTP endpoints have no Blazor AuthenticationStateProvider scope.
+        // NOTE:
+        // - Blazor component code runs in a circuit and can use AuthenticationStateProvider.
+        // - Minimal APIs and plain HTTP requests (e.g. <img src="...">) do NOT have that circuit scope.
+        //   If we call AuthenticationStateProvider there, it throws.
+        // Prefer HttpContext when available, and fall back to the circuit when not.
         var httpUser = httpContextAccessor.HttpContext?.User;
         if (httpUser?.Identity?.IsAuthenticated == true)
         {
