@@ -87,6 +87,7 @@ UI components should:
 - include appropriate ARIA attributes where needed
 - support keyboard navigation
 - follow accessible semantic HTML practices
+- Always follow the UI guidelines in .cursor/ui-guidelines.md for any UI work
 
 ---
 
