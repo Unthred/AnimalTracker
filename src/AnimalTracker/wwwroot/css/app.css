@@ -4,10 +4,14 @@
 
 @layer base {
   :root {
-    /* Allow native controls (date picker/select) to render dark UI correctly. */
-    color-scheme: light dark;
+    /* Keep native controls light unless we explicitly enable dark mode via the `dark` class. */
+    color-scheme: light;
 
     --accent: #0f172a;
+  }
+
+  html.dark {
+    color-scheme: dark;
   }
 
   input[type="checkbox"] {
@@ -16,10 +20,19 @@
 
   /* Slightly rounded checkboxes to match rounded-xl inputs (browser support varies). */
   .checkbox-soft {
-    /* Match select/input field surfaces */
-    @apply rounded-lg border border-slate-200/90 bg-white shadow-sm transition duration-200 ease-in-out;
+    /* Custom checkbox so background matches text inputs in light/dark. */
+    @apply appearance-none rounded-lg border border-slate-200/90 bg-white shadow-sm transition duration-200 ease-in-out;
     @apply hover:border-slate-300 hover:shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600;
     @apply focus:outline-none focus:ring-2 focus:ring-slate-300/80 dark:focus:ring-slate-600/80;
+    @apply checked:border-[var(--accent)] checked:bg-[var(--accent)];
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 0.85rem 0.85rem;
+  }
+
+  .checkbox-soft:checked {
+    /* White checkmark */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='M16.704 5.29a1 1 0 0 1 0 1.42l-7.07 7.07a1 1 0 0 1-1.415 0L3.296 9.854a1 1 0 1 1 1.414-1.414l3.106 3.106 6.363-6.363a1 1 0 0 1 1.422 0Z' fill='white'/%3E%3C/svg%3E");
   }
 
   /* Transparent so full-page backgrounds (MainLayout) paint above the canvas; routes supply their own base fill. */
@@ -76,24 +89,47 @@
   }
 
   .app-nav-link:hover {
-    background-color: color-mix(in srgb, var(--accent) 12%, transparent);
+    background-color: color-mix(in srgb, var(--accent) 8%, transparent);
   }
 
   .app-nav-link.active {
-    background-color: color-mix(in srgb, var(--accent) 16%, transparent);
+    background-color: color-mix(in srgb, var(--accent) 12%, transparent);
     color: var(--accent);
     font-weight: 700;
   }
 
-  @media (prefers-color-scheme: dark) {
-    .app-nav-link:hover {
-      background-color: color-mix(in srgb, var(--accent) 22%, rgb(2 6 23)); /* slate-950 */
-    }
+  .app-nav-sublink {
+    @apply block rounded-xl px-3 py-2 text-sm font-medium text-slate-700 transition duration-200 ease-in-out dark:text-slate-200;
+    text-decoration: none;
+    opacity: 0.9;
+  }
 
-    .app-nav-link.active {
-      background-color: color-mix(in srgb, var(--accent) 28%, rgb(2 6 23)); /* slate-950 */
-      color: color-mix(in srgb, var(--accent) 70%, white);
-    }
+  .app-nav-sublink:hover {
+    background-color: color-mix(in srgb, var(--accent) 8%, transparent);
+  }
+
+  .app-nav-sublink.active {
+    background-color: color-mix(in srgb, var(--accent) 12%, transparent);
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  html.dark .app-nav-link:hover {
+    background-color: color-mix(in srgb, var(--accent) 22%, rgb(2 6 23)); /* slate-950 */
+  }
+
+  html.dark .app-nav-link.active {
+    background-color: color-mix(in srgb, var(--accent) 28%, rgb(2 6 23)); /* slate-950 */
+    color: color-mix(in srgb, var(--accent) 70%, white);
+  }
+
+  html.dark .app-nav-sublink:hover {
+    background-color: color-mix(in srgb, var(--accent) 22%, rgb(2 6 23)); /* slate-950 */
+  }
+
+  html.dark .app-nav-sublink.active {
+    background-color: color-mix(in srgb, var(--accent) 28%, rgb(2 6 23)); /* slate-950 */
+    color: color-mix(in srgb, var(--accent) 70%, white);
   }
 
   /* Bootstrap-ish class compatibility for Identity UI */
@@ -177,19 +213,17 @@
     @apply dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80;
   }
 
-  /* Dropdown option list readability in dark mode */
-  @media (prefers-color-scheme: dark) {
-    select option {
-      background-color: rgb(15 23 42); /* slate-900 */
-      color: rgb(248 250 252); /* slate-50 */
-    }
+  /* Dropdown option list readability in dark mode (key off `dark` class, not OS preference). */
+  html.dark select option {
+    background-color: rgb(15 23 42); /* slate-900 */
+    color: rgb(248 250 252); /* slate-50 */
+  }
 
-    /* Ensure selected + hovered options are visible in the opened list */
-    select option:checked,
-    select option:hover {
-      background-color: color-mix(in srgb, var(--accent) 28%, rgb(15 23 42));
-      color: rgb(248 250 252);
-    }
+  /* Ensure selected + hovered options are visible in the opened list (dark mode). */
+  html.dark select option:checked,
+  html.dark select option:hover {
+    background-color: color-mix(in srgb, var(--accent) 28%, rgb(15 23 42));
+    color: rgb(248 250 252);
   }
 
   /* Some browsers need explicit selected option styling even in light mode */

@@ -1,4 +1,5 @@
 ﻿@implements IDisposable
+@rendermode InteractiveServer
 
 @inject NavigationManager NavigationManager
 
@@ -37,12 +38,54 @@
         <!-- User settings merged into Settings -->
 
         <AuthorizeView>
-            <Authorized>
+            <Authorized Context="auth">
                 <div class="mt-4 border-t border-slate-200/80 pt-4 dark:border-slate-800/80">
-                    <NavLink class="app-nav-link"
-                             href="Account/Manage">
-                        @context.User.Identity?.Name
-                    </NavLink>
+                    <button type="button"
+                            class="app-nav-link flex w-full items-center justify-between text-left"
+                            aria-expanded="@(ShowAccountMenu ? "true" : "false")"
+                            @onclick="ToggleAccountMenu">
+                        <span class="min-w-0 truncate">@auth.User.Identity?.Name</span>
+                        <span class="ml-2 text-xs text-slate-400 dark:text-slate-500">@(ShowAccountMenu ? "▾" : "▸")</span>
+                    </button>
+
+                    @if (ShowAccountMenu)
+                    {
+                        <div class="mt-1 ml-2 flex flex-col gap-1">
+                            <NavLink class="app-nav-sublink"
+                                     href="Account/Manage" Match="NavLinkMatch.All">
+                                Profile
+                            </NavLink>
+                            <NavLink class="app-nav-sublink"
+                                     href="Account/Manage/Email">
+                                Email
+                            </NavLink>
+                            <NavLink class="app-nav-sublink"
+                                     href="Account/Manage/ChangePassword">
+                                Password
+                            </NavLink>
+                            <NavLink class="app-nav-sublink"
+                                     href="Account/Manage/TwoFactorAuthentication">
+                                Two-factor authentication
+                            </NavLink>
+                            <NavLink class="app-nav-sublink"
+                                     href="Account/Manage/Passkeys">
+                                Passkeys
+                            </NavLink>
+                            <NavLink class="app-nav-sublink"
+                                     href="Account/Manage/PersonalData">
+                                Personal data
+                            </NavLink>
+                        </div>
+                    }
+
+                    <AuthorizeView Roles="AnimalTracker.Services.AdminUserService.AdminRoleName" Context="adminAuth">
+                        <div class="mt-3 border-t border-slate-200/80 pt-3 dark:border-slate-800/80">
+                            <NavLink class="app-nav-link"
+                                     href="admin/users">
+                                Admin
+                            </NavLink>
+                        </div>
+                    </AuthorizeView>
 
                     <form action="Account/Logout" method="post">
                         <AntiforgeryToken />
@@ -69,6 +112,7 @@
 
 @code {
     private string? currentUrl;
+    private bool accountMenuExpanded;
 
     protected override void OnInitialized()
     {
@@ -79,8 +123,19 @@
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
         currentUrl = NavigationManager.ToBaseRelativePath(e.Location);
+        if (!IsOnAccountPage)
+            accountMenuExpanded = false;
         StateHasChanged();
     }
+
+    private bool IsOnAccountPage =>
+        !string.IsNullOrWhiteSpace(currentUrl) &&
+        currentUrl.StartsWith("Account/Manage", StringComparison.OrdinalIgnoreCase);
+
+    private bool ShowAccountMenu => accountMenuExpanded || IsOnAccountPage;
+
+    private void ToggleAccountMenu() =>
+        accountMenuExpanded = !accountMenuExpanded;
 
     public void Dispose()
     {
