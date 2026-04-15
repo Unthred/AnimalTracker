@@ -34,6 +34,11 @@ cp .env.example .env
 3. Edit `.env` and set:
 - `APP_PORT` (default `8085`)
 - `DATA_ROOT` (default `./data`, or absolute `/mnt/user/appdata/animaltracker`)
+- optional logging levels:
+  - `LOG_LEVEL_DEFAULT`
+  - `LOG_LEVEL_ASPNETCORE`
+  - `LOG_LEVEL_EF_SQL` (set `Information` temporarily to see SQL)
+  - `LOG_LEVEL_EF_MIGRATIONS`
 - optional first-run admin bootstrap:
   - `ANIMALTRACKER_ADMIN_EMAIL`
   - `ANIMALTRACKER_ADMIN_PASSWORD`

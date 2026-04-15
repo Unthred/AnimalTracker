@@ -75,12 +75,13 @@
                                      href="Account/Manage/PersonalData">
                                 Personal data
                             </NavLink>
-                            <AuthorizeView Roles="AnimalTracker.Services.AdminUserService.AdminRoleName" Context="adminAuth">
+                            @if (auth.User.IsInRole(AnimalTracker.Services.AdminUserService.AdminRoleName))
+                            {
                                 <NavLink class="app-nav-sublink"
                                          href="admin">
                                     Admin
                                 </NavLink>
-                            </AuthorizeView>
+                            }
                         </div>
                     }
 

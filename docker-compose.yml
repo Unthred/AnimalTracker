@@ -11,6 +11,10 @@ services:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
       AnimalTracker__AdminEmail: ${ANIMALTRACKER_ADMIN_EMAIL:-}
       AnimalTracker__AdminPassword: ${ANIMALTRACKER_ADMIN_PASSWORD:-}
+      Logging__LogLevel__Default: ${LOG_LEVEL_DEFAULT:-Information}
+      Logging__LogLevel__Microsoft.AspNetCore: ${LOG_LEVEL_ASPNETCORE:-Warning}
+      Logging__LogLevel__Microsoft.EntityFrameworkCore.Database.Command: ${LOG_LEVEL_EF_SQL:-Warning}
+      Logging__LogLevel__Microsoft.EntityFrameworkCore.Migrations: ${LOG_LEVEL_EF_MIGRATIONS:-Information}
     ports:
       # For HAProxy backend, map an internal port on UnRaid host
       - "${APP_PORT:-8085}:8080"

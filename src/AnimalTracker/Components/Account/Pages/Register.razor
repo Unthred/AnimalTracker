@@ -79,27 +79,10 @@ else
     @* External providers not used for this app *@
 </div>
 
-<script>
-    (() => {
-        try {
-            const mode = ('@defaultThemeMode' || 'system').toLowerCase();
-            if (window.animalTrackerSetTheme) {
-                window.animalTrackerSetTheme(mode);
-            } else {
-                const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-                const dark = mode === 'dark' || (mode === 'system' && prefersDark);
-                document.documentElement.classList.toggle('dark', !!dark);
-                document.cookie = `animaltracker_theme=${encodeURIComponent(mode)}; Path=/; Max-Age=${180 * 24 * 60 * 60}; SameSite=Lax`;
-            }
-        } catch { /* ignore */ }
-    })();
-</script>
-
 @code {
     private IEnumerable<IdentityError>? identityErrors;
     private bool hasDefaultAuthImage;
     private long defaultAuthImageStamp;
-    private string defaultThemeMode = "system";
     private string DefaultAuthBackgroundStyle => $"""background-image: url('/app/default-auth-image?t={defaultAuthImageStamp}');""";
     private bool canBecomeAdmin;
 
@@ -118,7 +101,6 @@ else
         var appDefaults = await AppSettings.GetOrCreateAsync();
         hasDefaultAuthImage = !string.IsNullOrWhiteSpace(appDefaults.DefaultAuthImageRelativePath);
         defaultAuthImageStamp = appDefaults.UpdatedAtUtc.Ticks;
-        defaultThemeMode = appDefaults.DefaultThemeMode;
 
         var totalUsers = await UserManager.Users.CountAsync();
         canBecomeAdmin = totalUsers == 0;

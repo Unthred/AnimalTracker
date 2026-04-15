@@ -4,6 +4,7 @@
 @implements IDisposable
 
 @inject UserSettingsService Settings
+@inject AppSettingsService AppSettings
 @inject AuthenticationStateProvider AuthStateProvider
 @inject AnimalTracker.State.UserPreferencesState Prefs
 @inject IJSRuntime JS
@@ -20,6 +21,7 @@
     private string? accent;
     private string? lastAppliedThemeMode;
     private string? lastAppliedUserId;
+    private string themeModeOverride = "system";
 
     protected override async Task OnInitializedAsync()
     {
@@ -32,10 +34,11 @@
     {
         // JS interop is only valid after interactive render begins (not during prerender).
         // Re-apply theme on navigation/rerenders if needed.
-        if (lastAppliedThemeMode != Prefs.ThemeMode)
+        var desiredThemeMode = string.IsNullOrWhiteSpace(themeModeOverride) ? Prefs.ThemeMode : themeModeOverride;
+        if (lastAppliedThemeMode != desiredThemeMode)
         {
-            await ApplyThemeAsync();
-            lastAppliedThemeMode = Prefs.ThemeMode;
+            await ApplyThemeAsync(desiredThemeMode);
+            lastAppliedThemeMode = desiredThemeMode;
         }
     }
 
@@ -58,6 +61,8 @@
         if (auth.User.Identity?.IsAuthenticated != true)
         {
             lastAppliedUserId = null;
+            var appDefaults = await AppSettings.GetOrCreateAsync();
+            themeModeOverride = string.IsNullOrWhiteSpace(appDefaults.DefaultThemeMode) ? "system" : appDefaults.DefaultThemeMode;
             return;
         }
 
@@ -73,10 +78,11 @@
         Prefs.Apply(s);
         accent = Prefs.AccentColorHex;
         lastAppliedUserId = userId;
+        themeModeOverride = "";
     }
 
-    private ValueTask ApplyThemeAsync() =>
-        JS.InvokeVoidAsync("animalTrackerSetTheme", Prefs.ThemeMode);
+    private ValueTask ApplyThemeAsync(string themeMode) =>
+        JS.InvokeVoidAsync("animalTrackerSetTheme", themeMode);
 
     public void Dispose()
     {
