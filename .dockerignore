@@ -1,0 +1,12 @@
+.git
+.gitignore
+.cursor
+node_modules
+data
+**/bin
+**/obj
+**/*.db
+**/*.db-shm
+**/*.db-wal
+**/App_Data
+**/.DS_Store

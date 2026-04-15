@@ -1,18 +1,21 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-COPY package*.json ./
-COPY tailwind.config.js ./
-COPY postcss.config.js ./
-COPY ./src/AnimalTracker/ ./src/AnimalTracker/
-WORKDIR /src/src/AnimalTracker
 RUN apt-get update \
     && apt-get install -y --no-install-recommends nodejs npm \
     && rm -rf /var/lib/apt/lists/*
+
+COPY package*.json ./
+COPY tailwind.config.js ./
+COPY postcss.config.js ./
 RUN npm ci --prefix /src
+
+COPY ./src/AnimalTracker/AnimalTracker.csproj ./src/AnimalTracker/
+RUN dotnet restore ./src/AnimalTracker/AnimalTracker.csproj
+
+COPY ./src/AnimalTracker/ ./src/AnimalTracker/
 RUN npm run build:css --prefix /src
-RUN dotnet restore
-RUN dotnet publish -c Release -o /app/publish
+RUN dotnet publish ./src/AnimalTracker/AnimalTracker.csproj -c Release -o /app/publish --no-restore
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
