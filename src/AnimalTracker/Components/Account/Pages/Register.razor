@@ -5,6 +5,7 @@
 @using System.Text.Encodings.Web
 @using Microsoft.AspNetCore.Identity
 @using Microsoft.AspNetCore.WebUtilities
+@using Microsoft.EntityFrameworkCore
 @using AnimalTracker.Data
 
 @inject UserManager<ApplicationUser> UserManager
@@ -14,6 +15,8 @@
 @inject ILogger<Register> Logger
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
+@inject AnimalTracker.Services.AdminUserService AdminUsers
+@inject AnimalTracker.Services.AppSettingsService AppSettings
 
 <PageTitle>Register</PageTitle>
 
@@ -22,6 +25,13 @@
 
 <div class="mx-auto w-full max-w-xl py-10 sm:py-14">
     <UIPageHeader Title="Create account" Description="Register to start tracking sightings." />
+
+    @if (hasDefaultAuthImage)
+    {
+        <UICard Class="mb-6 overflow-hidden p-0">
+            <img src="@($"/app/default-auth-image?t={defaultAuthImageStamp}")" alt="AnimalTracker welcome image" class="h-40 w-full object-cover sm:h-56" />
+        </UICard>
+    }
 
     <UICard>
         <StatusMessage Message="@Message" />
@@ -50,6 +60,13 @@
 
             <UIButton Type="submit" Variant="UiButtonVariant.Primary" Class="w-full">Register</UIButton>
 
+            @if (canBecomeAdmin)
+            {
+                <div class="rounded-xl border border-emerald-200/80 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/50 dark:text-emerald-200">
+                    This first account becomes the admin account.
+                </div>
+            }
+
             <div class="text-sm text-slate-600 dark:text-slate-300">
                 Already have an account?
                 <a class="font-medium text-slate-900 hover:underline dark:text-slate-50"
@@ -61,8 +78,31 @@
     @* External providers not used for this app *@
 </div>
 
+<script>
+    (() => {
+        try {
+            const readCookie = (name) => {
+                const prefix = name + '=';
+                for (const part of document.cookie.split(';')) {
+                    const value = part.trim();
+                    if (value.startsWith(prefix)) return decodeURIComponent(value.substring(prefix.length));
+                }
+                return null;
+            };
+
+            if (!readCookie('animaltracker_theme')) {
+                document.cookie = `animaltracker_theme=${encodeURIComponent('@defaultThemeMode')}; Path=/; Max-Age=${180 * 24 * 60 * 60}; SameSite=Lax`;
+            }
+        } catch { /* ignore */ }
+    })();
+</script>
+
 @code {
     private IEnumerable<IdentityError>? identityErrors;
+    private bool hasDefaultAuthImage;
+    private long defaultAuthImageStamp;
+    private string defaultThemeMode = "system";
+    private bool canBecomeAdmin;
 
     [SupplyParameterFromForm]
     private InputModel Input { get; set; } = default!;
@@ -72,9 +112,17 @@
 
     private string? Message => identityErrors is null ? null : $"Error: {string.Join(", ", identityErrors.Select(error => error.Description))}";
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         Input ??= new();
+
+        var appDefaults = await AppSettings.GetOrCreateAsync();
+        hasDefaultAuthImage = !string.IsNullOrWhiteSpace(appDefaults.DefaultAuthImageRelativePath);
+        defaultAuthImageStamp = appDefaults.UpdatedAtUtc.Ticks;
+        defaultThemeMode = appDefaults.DefaultThemeMode;
+
+        var totalUsers = await UserManager.Users.CountAsync();
+        canBecomeAdmin = totalUsers == 0;
     }
 
     public async Task RegisterUser(EditContext editContext)
@@ -93,6 +141,18 @@
         }
 
         Logger.LogInformation("User created a new account with password.");
+
+        await AdminUsers.EnsureAdminRoleAsync();
+        var admins = await UserManager.GetUsersInRoleAsync(AnimalTracker.Services.AdminUserService.AdminRoleName);
+        if (admins.Count == 0)
+        {
+            var adminResult = await UserManager.AddToRoleAsync(user, AnimalTracker.Services.AdminUserService.AdminRoleName);
+            if (!adminResult.Succeeded)
+            {
+                identityErrors = adminResult.Errors;
+                return;
+            }
+        }
 
         var userId = await UserManager.GetUserIdAsync(user);
         var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);

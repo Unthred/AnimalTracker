@@ -77,6 +77,7 @@ builder.Services.AddScoped<TimelineFilterState>();
 builder.Services.AddScoped<UserSettingsService>();
 builder.Services.AddScoped<UserPreferencesState>();
 builder.Services.AddScoped<AdminUserService>();
+builder.Services.AddScoped<AppSettingsService>();
 
 var app = builder.Build();
 
@@ -86,6 +87,7 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     await db.Database.MigrateAsync();
     await EnsureSqliteUserSettingsColumnsAsync(db);
+    await EnsureSqliteAppSettingsTableAsync(db);
     var adminUsers = scope.ServiceProvider.GetRequiredService<AdminUserService>();
     await adminUsers.EnsureAdminRoleAsync();
     await EnsureAdminUserAsync(scope.ServiceProvider);
@@ -149,6 +151,20 @@ app.MapGet("/user/background-image", [Authorize] async (
 
     var stream = storage.OpenRead(path);
     var contentType = PhotoStorageService.GetContentTypeForStoredPath(path);
+    return Results.File(stream, contentType, enableRangeProcessing: true);
+});
+
+app.MapGet("/app/default-auth-image", async (
+    AppSettingsService settingsService,
+    PhotoStorageService storage,
+    CancellationToken cancellationToken) =>
+{
+    var settings = await settingsService.GetOrCreateAsync(cancellationToken);
+    if (string.IsNullOrWhiteSpace(settings.DefaultAuthImageRelativePath))
+        return Results.NotFound();
+
+    var stream = storage.OpenRead(settings.DefaultAuthImageRelativePath);
+    var contentType = PhotoStorageService.GetContentTypeForStoredPath(settings.DefaultAuthImageRelativePath);
     return Results.File(stream, contentType, enableRangeProcessing: true);
 });
 
@@ -229,6 +245,22 @@ static async Task EnsureSqliteUserSettingsColumnsAsync(ApplicationDbContext db)
 
     await TryAddAsync("BackgroundImageRelativePath", "ALTER TABLE UserSettings ADD COLUMN BackgroundImageRelativePath TEXT NULL");
     await TryAddAsync("ThemeMode", "ALTER TABLE UserSettings ADD COLUMN ThemeMode TEXT NOT NULL DEFAULT 'system'");
+}
+
+static async Task EnsureSqliteAppSettingsTableAsync(ApplicationDbContext db)
+{
+    if (!db.Database.IsSqlite())
+        return;
+
+    await db.Database.ExecuteSqlRawAsync("""
+        CREATE TABLE IF NOT EXISTS AppSettings (
+            Id INTEGER NOT NULL CONSTRAINT PK_AppSettings PRIMARY KEY AUTOINCREMENT,
+            DefaultThemeMode TEXT NOT NULL DEFAULT 'system',
+            DefaultAuthImageRelativePath TEXT NULL,
+            CreatedAtUtc TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+            UpdatedAtUtc TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP)
+        );
+        """);
 }
 
 static async Task EnsureAdminUserAsync(IServiceProvider sp)

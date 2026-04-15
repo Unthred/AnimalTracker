@@ -10,6 +10,7 @@
 @inject ILogger<Login> Logger
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
+@inject AnimalTracker.Services.AppSettingsService AppSettings
 
 <PageTitle>Log in</PageTitle>
 
@@ -18,6 +19,13 @@
 
 <div class="mx-auto w-full max-w-xl py-10 sm:py-14">
     <UIPageHeader Title="Log in" Description="Welcome back. Sign in to continue." />
+
+    @if (hasDefaultAuthImage)
+    {
+        <UICard Class="mb-6 overflow-hidden p-0">
+            <img src="@($"/app/default-auth-image?t={defaultAuthImageStamp}")" alt="AnimalTracker welcome image" class="h-40 w-full object-cover sm:h-56" />
+        </UICard>
+    }
 
     <UICard>
         <StatusMessage Message="@errorMessage" />
@@ -71,9 +79,31 @@
     @* External providers not used for this app *@
 </div>
 
+<script>
+    (() => {
+        try {
+            const readCookie = (name) => {
+                const prefix = name + '=';
+                for (const part of document.cookie.split(';')) {
+                    const value = part.trim();
+                    if (value.startsWith(prefix)) return decodeURIComponent(value.substring(prefix.length));
+                }
+                return null;
+            };
+
+            if (!readCookie('animaltracker_theme')) {
+                document.cookie = `animaltracker_theme=${encodeURIComponent('@defaultThemeMode')}; Path=/; Max-Age=${180 * 24 * 60 * 60}; SameSite=Lax`;
+            }
+        } catch { /* ignore */ }
+    })();
+</script>
+
 @code {
     private string? errorMessage;
     private EditContext editContext = default!;
+    private bool hasDefaultAuthImage;
+    private long defaultAuthImageStamp;
+    private string defaultThemeMode = "system";
 
     [CascadingParameter]
     private HttpContext HttpContext { get; set; } = default!;
@@ -89,6 +119,11 @@
         Input ??= new();
 
         editContext = new EditContext(Input);
+
+        var appDefaults = await AppSettings.GetOrCreateAsync();
+        hasDefaultAuthImage = !string.IsNullOrWhiteSpace(appDefaults.DefaultAuthImageRelativePath);
+        defaultAuthImageStamp = appDefaults.UpdatedAtUtc.Ticks;
+        defaultThemeMode = appDefaults.DefaultThemeMode;
 
         if (HttpMethods.IsGet(HttpContext.Request.Method))
         {

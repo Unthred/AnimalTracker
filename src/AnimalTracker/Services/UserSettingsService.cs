@@ -6,7 +6,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AnimalTracker.Services;
 
-public sealed class UserSettingsService(ApplicationDbContext db, CurrentUserService currentUser, PhotoStorageService photos)
+public sealed class UserSettingsService(
+    ApplicationDbContext db,
+    CurrentUserService currentUser,
+    PhotoStorageService photos,
+    AppSettingsService appSettings)
 {
     private static readonly Regex Hex = new("^#[0-9a-fA-F]{6}$", RegexOptions.Compiled);
 
@@ -18,6 +22,7 @@ public sealed class UserSettingsService(ApplicationDbContext db, CurrentUserServ
         if (existing is not null)
             return existing;
 
+        var defaults = await appSettings.GetOrCreateAsync(cancellationToken);
         var now = DateTime.UtcNow;
         var created = new UserSettings
         {
@@ -25,7 +30,7 @@ public sealed class UserSettingsService(ApplicationDbContext db, CurrentUserServ
             AccentColorHex = "#0f172a",
             CompactMode = false,
             TimelinePageSize = 50,
-            ThemeMode = "system",
+            ThemeMode = defaults.DefaultThemeMode,
             CreatedAtUtc = now,
             UpdatedAtUtc = now
         };

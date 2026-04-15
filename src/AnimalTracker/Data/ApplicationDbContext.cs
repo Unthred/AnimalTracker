@@ -12,6 +12,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Sighting> Sightings => Set<Sighting>();
     public DbSet<SightingPhoto> SightingPhotos => Set<SightingPhoto>();
     public DbSet<UserSettings> UserSettings => Set<UserSettings>();
+    public DbSet<AppSettings> AppSettings => Set<AppSettings>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -55,6 +56,13 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         builder.Entity<UserSettings>(e =>
         {
             e.HasIndex(x => x.OwnerUserId).IsUnique();
+            e.Property(x => x.CreatedAtUtc).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            e.Property(x => x.UpdatedAtUtc).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        });
+
+        builder.Entity<AppSettings>(e =>
+        {
+            e.Property(x => x.DefaultThemeMode).HasDefaultValue("system");
             e.Property(x => x.CreatedAtUtc).HasDefaultValueSql("CURRENT_TIMESTAMP");
             e.Property(x => x.UpdatedAtUtc).HasDefaultValueSql("CURRENT_TIMESTAMP");
         });

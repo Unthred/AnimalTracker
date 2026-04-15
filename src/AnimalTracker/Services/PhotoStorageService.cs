@@ -142,6 +142,46 @@ public sealed class PhotoStorageService(IWebHostEnvironment env, CurrentUserServ
             Sha256Hex: stored.Sha256Hex);
     }
 
+    /// <summary>
+    /// Saves the shared auth-page image shown on login/register.
+    /// </summary>
+    public async Task<StoredPhoto> SaveAuthPageImageAsync(
+        IBrowserFile file,
+        long maxBytes = DefaultMaxBackgroundBytes,
+        CancellationToken cancellationToken = default)
+    {
+        if (GuessExtension(file.ContentType) is null)
+            throw new ArgumentException("Image must be a JPEG, PNG, GIF, or WebP image.", nameof(file));
+
+        if (file.Size <= 0)
+            throw new ArgumentException("File is empty.", nameof(file));
+        if (file.Size > maxBytes)
+            throw new ArgumentException($"Image is too large. Max {(maxBytes / BytesPerMb)} MB.", nameof(file));
+
+        var dir = Path.Combine(env.ContentRootPath, "App_Data", "auth-page");
+        Directory.CreateDirectory(dir);
+
+        var fileName = $"{Guid.NewGuid():N}.jpg";
+        var absPath = Path.Combine(dir, fileName);
+
+        var originalName = Path.GetFileName(file.Name);
+        var stored = await SaveOptimizedJpegAsync(
+            file,
+            absPath,
+            maxAllowedBytes: maxBytes,
+            maxDimensionPx: DefaultBackgroundMaxDimensionPx,
+            jpegQuality: DefaultJpegQuality,
+            cancellationToken: cancellationToken);
+
+        var relative = Path.GetRelativePath(env.ContentRootPath, absPath).Replace('\\', '/');
+        return new StoredPhoto(
+            StoredRelativePath: relative,
+            OriginalFileName: originalName,
+            ContentType: "image/jpeg",
+            SizeBytes: stored.SizeBytes,
+            Sha256Hex: stored.Sha256Hex);
+    }
+
     private static string? GuessExtension(string contentType) =>
         contentType.ToLowerInvariant() switch
         {
