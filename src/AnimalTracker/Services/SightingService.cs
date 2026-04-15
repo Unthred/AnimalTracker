@@ -106,6 +106,63 @@ public sealed class SightingService(ApplicationDbContext db, CurrentUserService 
         await db.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<Sighting> UpdateAsync(
+        int id,
+        DateTime occurredAtUtc,
+        int speciesId,
+        int? locationId,
+        int? animalId,
+        string? notes,
+        CancellationToken cancellationToken = default)
+    {
+        var userId = await currentUser.GetRequiredUserIdAsync(cancellationToken);
+
+        var entity = await db.Sightings.FirstOrDefaultAsync(
+            x => x.Id == id && x.OwnerUserId == userId,
+            cancellationToken);
+
+        if (entity is null)
+            throw new InvalidOperationException("Sighting not found.");
+
+        // Validate / resolve location
+        var resolvedLocationId = locationId ?? (await locations.GetOrCreateDefaultAsync(cancellationToken)).Id;
+        var locationOk = await db.Locations.AsNoTracking()
+            .AnyAsync(l => l.Id == resolvedLocationId && l.OwnerUserId == userId, cancellationToken);
+        if (!locationOk)
+            throw new InvalidOperationException("Location not found.");
+
+        // Validate animal ownership if provided
+        if (animalId is not null)
+        {
+            var animalOk = await db.Animals.AsNoTracking()
+                .AnyAsync(a => a.Id == animalId && a.OwnerUserId == userId, cancellationToken);
+            if (!animalOk)
+                throw new InvalidOperationException("Animal not found.");
+        }
+
+        entity.OccurredAtUtc = occurredAtUtc;
+        entity.SpeciesId = speciesId;
+        entity.LocationId = resolvedLocationId;
+        entity.AnimalId = animalId;
+        entity.Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+        entity.UpdatedAtUtc = DateTime.UtcNow;
+
+        await db.SaveChangesAsync(cancellationToken);
+        return entity;
+    }
+
+    public async Task<int?> GetLatestPhotoIdForAnimalAsync(int animalId, CancellationToken cancellationToken = default)
+    {
+        var userId = await currentUser.GetRequiredUserIdAsync(cancellationToken);
+
+        return await db.SightingPhotos
+            .AsNoTracking()
+            .Where(p => p.Sighting.OwnerUserId == userId && p.Sighting.AnimalId == animalId)
+            .OrderByDescending(p => p.CreatedAtUtc)
+            .Select(p => (int?)p.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     public async Task DeleteAsync(int id, CancellationToken cancellationToken = default)
     {
         var userId = await currentUser.GetRequiredUserIdAsync(cancellationToken);
@@ -116,6 +173,7 @@ public sealed class SightingService(ApplicationDbContext db, CurrentUserService 
         if (entity is null)
             throw new InvalidOperationException("Sighting not found.");
 
+        // Photos are stored on disk; deleting the DB row alone would orphan files.
         foreach (var p in entity.Photos)
             photos.TryDeleteStoredFile(p.StoredPath);
 

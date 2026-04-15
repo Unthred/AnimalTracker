@@ -1,0 +1,128 @@
+@page "/animals/{Id:int}/edit"
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+
+@using AnimalTracker.Components.UI
+@using AnimalTracker.Services
+@using AnimalTracker.Data.Entities
+@inject AnimalService Animals
+@inject SpeciesService Species
+@inject NavigationManager Nav
+
+<PageTitle>Edit Animal</PageTitle>
+
+@if (loading)
+{
+    <p class="text-sm text-slate-600 dark:text-slate-400">Loading…</p>
+}
+else if (animal is null)
+{
+    <UIAlert Variant="UiAlertVariant.Neutral">Animal not found.</UIAlert>
+}
+else
+{
+    <UIPageHeader Title="Edit animal" Description="Fix name, species, or notes for this profile." />
+
+    @if (!string.IsNullOrWhiteSpace(error))
+    {
+        <UIAlert Variant="UiAlertVariant.Danger" Class="mb-8">@error</UIAlert>
+    }
+
+    <UICard>
+        <EditForm Model="model" OnValidSubmit="SaveAsync" class="space-y-6">
+            <DataAnnotationsValidator />
+
+            <UIField Label="Species" For="species">
+                <select id="species" class="w-full min-w-0 px-3 py-2.5" @bind="model.SpeciesId">
+                    <option value="">Select…</option>
+                    @foreach (var s in species)
+                    {
+                        <option value="@s.Id">@s.Name</option>
+                    }
+                </select>
+                <ValidationMessage For="() => model.SpeciesId" />
+            </UIField>
+
+            <UIField Label="Name (optional)" For="displayName">
+                <InputText id="displayName"
+                           class="w-full min-w-0 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80"
+                           @bind-Value="model.DisplayName" />
+            </UIField>
+
+            <UIField Label="Identifying features" For="features">
+                <InputTextArea id="features" class="w-full min-w-0 px-3 py-2.5" @bind-Value="model.IdentifyingFeatures" rows="4" />
+            </UIField>
+
+            <UIField Label="Notes" For="notes">
+                <InputTextArea id="notes" class="w-full min-w-0 px-3 py-2.5" @bind-Value="model.Notes" rows="4" />
+            </UIField>
+
+            <div class="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:flex-wrap sm:justify-end sm:gap-3">
+                <UIButton Href="@($"/animals/{Id}")" Variant="UiButtonVariant.Outline" Class="w-full sm:w-auto">Cancel</UIButton>
+                <UIButton Type="submit" Variant="UiButtonVariant.Primary" Class="w-full sm:w-auto">Save changes</UIButton>
+            </div>
+        </EditForm>
+    </UICard>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private bool loading = true;
+    private Animal? animal;
+    private List<Species> species = [];
+    private string? error;
+
+    private readonly Model model = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true;
+        error = null;
+
+        species = await Species.GetAllAsync();
+        animal = await Animals.GetAsync(Id);
+        if (animal is not null)
+        {
+            model.SpeciesId = animal.SpeciesId;
+            model.DisplayName = animal.DisplayName;
+            model.IdentifyingFeatures = animal.IdentifyingFeatures;
+            model.Notes = animal.Notes;
+        }
+
+        loading = false;
+    }
+
+    private async Task SaveAsync()
+    {
+        error = null;
+        try
+        {
+            var updated = await Animals.UpdateAsync(
+                id: Id,
+                speciesId: model.SpeciesId!.Value,
+                displayName: model.DisplayName,
+                identifyingFeatures: model.IdentifyingFeatures,
+                notes: model.Notes);
+
+            Nav.NavigateTo($"/animals/{updated.Id}");
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private sealed class Model
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        public int? SpeciesId { get; set; }
+
+        public string? DisplayName { get; set; }
+        public string? IdentifyingFeatures { get; set; }
+        public string? Notes { get; set; }
+    }
+}
+

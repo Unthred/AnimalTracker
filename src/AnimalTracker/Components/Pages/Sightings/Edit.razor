@@ -1,0 +1,233 @@
+@page "/sightings/{Id:int}/edit"
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+
+@using AnimalTracker.Services
+@using AnimalTracker.Data.Entities
+@inject SightingService Sightings
+@inject SpeciesService Species
+@inject LocationService Locations
+@inject AnimalService Animals
+@inject NavigationManager Nav
+
+<PageTitle>Edit sighting</PageTitle>
+
+@if (loading)
+{
+    <p class="text-sm text-slate-600 dark:text-slate-400">Loading…</p>
+}
+else if (sighting is null)
+{
+    <UIAlert Variant="UiAlertVariant.Neutral">Sighting not found.</UIAlert>
+}
+else
+{
+    <UIPageHeader Title="Edit sighting" Description="Fix time, species, location, notes, or link an animal." />
+
+    @if (!string.IsNullOrWhiteSpace(error))
+    {
+        <UIAlert Variant="UiAlertVariant.Danger" Class="mb-8">@error</UIAlert>
+    }
+
+    <UICard>
+        <EditForm Model="model" OnValidSubmit="SaveAsync" class="space-y-6">
+            <DataAnnotationsValidator />
+
+            <div class="grid min-w-0 grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8">
+                <UIField Label="When" For="occurredAt">
+                    <div class="min-w-0">
+                        <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Date</span>
+                        <InputDate id="occurredAt" @bind-Value="model.OccurredAtLocalDate"
+                                   class="block w-full min-w-0 max-w-full rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:focus:ring-slate-800/80" />
+                        <ValidationMessage For="() => model.OccurredAtLocalDate" />
+                    </div>
+                </UIField>
+
+                <UIField Label="Time" For="occurredHour" Hint="24-hour clock using the same dropdown styling as Species and Location.">
+                    <div class="grid min-w-0 grid-cols-2 gap-3 sm:gap-4">
+                        <div class="min-w-0">
+                            <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Hour</span>
+                            <select id="occurredHour" class="w-full min-w-0 px-3 py-2.5" @bind="hourPart" @bind:after="SyncModelTimeFromParts">
+                                @for (var h = 0; h < 24; h++)
+                                {
+                                    <option value="@h">@h.ToString("00")</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="min-w-0">
+                            <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Minute</span>
+                            <select id="occurredMinute" class="w-full min-w-0 px-3 py-2.5" @bind="minutePart" @bind:after="SyncModelTimeFromParts">
+                                @for (var m = 0; m < 60; m++)
+                                {
+                                    <option value="@m">@m.ToString("00")</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                </UIField>
+            </div>
+
+            <div class="grid min-w-0 grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8">
+                <UIField Label="Species" For="species">
+                    <select id="species" class="w-full min-w-0 px-3 py-2.5" @bind="model.SpeciesId">
+                        <option value="">Select…</option>
+                        @foreach (var s in species)
+                        {
+                            <option value="@s.Id">@s.Name</option>
+                        }
+                    </select>
+                    <ValidationMessage For="() => model.SpeciesId" />
+                </UIField>
+
+                <UIField Label="Location" For="location">
+                    <select id="location" class="w-full min-w-0 px-3 py-2.5" @bind="model.LocationId">
+                        <option value="">Default</option>
+                        @foreach (var l in locations)
+                        {
+                            <option value="@l.Id">@l.Name</option>
+                        }
+                    </select>
+                </UIField>
+            </div>
+
+            <UIField Label="Linked animal" For="animal">
+                <select id="animal" class="w-full min-w-0 px-3 py-2.5" @bind="model.AnimalId">
+                    <option value="">None (unknown)</option>
+                    @foreach (var a in animals)
+                    {
+                        <option value="@a.Id">@GetAnimalLabel(a)</option>
+                    }
+                </select>
+            </UIField>
+
+            <UIField Label="Notes" For="notes">
+                <InputTextArea id="notes" class="w-full min-w-0 px-3 py-2.5" @bind-Value="model.Notes" rows="4" />
+            </UIField>
+
+            <div class="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:flex-wrap sm:justify-end sm:gap-3">
+                <UIButton Href="@($"/sightings/{Id}")" Variant="UiButtonVariant.Outline" Class="w-full sm:w-auto">Cancel</UIButton>
+                <UIButton Type="submit" Variant="UiButtonVariant.Primary" Class="w-full sm:w-auto">Save changes</UIButton>
+            </div>
+        </EditForm>
+    </UICard>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private bool loading = true;
+    private Sighting? sighting;
+    private List<Species> species = [];
+    private List<Location> locations = [];
+    private List<Animal> animals = [];
+    private string? error;
+
+    private readonly Model model = new();
+    private int hourPart;
+    private int minutePart;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true;
+        error = null;
+
+        species = await Species.GetAllAsync();
+        locations = await Locations.GetAllAsync();
+        if (locations.Count == 0)
+        {
+            await Locations.GetOrCreateDefaultAsync();
+            locations = await Locations.GetAllAsync();
+        }
+        animals = await Animals.SearchAsync(query: null, speciesId: null);
+
+        sighting = await Sightings.GetAsync(Id);
+        if (sighting is not null)
+        {
+            model.SpeciesId = sighting.SpeciesId;
+            model.LocationId = sighting.LocationId;
+            model.AnimalId = sighting.AnimalId;
+            model.Notes = sighting.Notes;
+
+            var local = sighting.OccurredAtUtc.ToLocalTime();
+            model.OccurredAtLocalDate = local.Date;
+            model.OccurredAtLocalTime = local.ToString("HH:mm");
+
+            LoadTimePartsFromModel();
+        }
+
+        loading = false;
+    }
+
+    private string GetAnimalLabel(Animal a) =>
+        !string.IsNullOrWhiteSpace(a.DisplayName) ? a.DisplayName : $"Animal #{a.Id} · {a.Species.Name}";
+
+    private void LoadTimePartsFromModel()
+    {
+        if (!TimeOnly.TryParse(model.OccurredAtLocalTime, out var t))
+            t = TimeOnly.FromDateTime(DateTime.Now);
+        hourPart = t.Hour;
+        minutePart = t.Minute;
+    }
+
+    private void SyncModelTimeFromParts() =>
+        model.OccurredAtLocalTime = $"{hourPart:D2}:{minutePart:D2}";
+
+    private async Task SaveAsync()
+    {
+        error = null;
+        try
+        {
+            var occurredAtUtc = model.GetOccurredAtUtc();
+            var updated = await Sightings.UpdateAsync(
+                id: Id,
+                occurredAtUtc: occurredAtUtc,
+                speciesId: model.SpeciesId!.Value,
+                locationId: model.LocationId,
+                animalId: model.AnimalId,
+                notes: model.Notes);
+
+            Nav.NavigateTo($"/sightings/{updated.Id}");
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    private sealed class Model
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        public int? SpeciesId { get; set; }
+
+        public int? LocationId { get; set; }
+
+        public int? AnimalId { get; set; }
+
+        [System.ComponentModel.DataAnnotations.Required]
+        public DateTime OccurredAtLocalDate { get; set; } = DateTime.Now.Date;
+
+        public string OccurredAtLocalTime { get; set; } = DateTime.Now.ToString("HH:mm");
+
+        public string? Notes { get; set; }
+
+        public DateTime GetOccurredAtUtc()
+        {
+            if (!TimeOnly.TryParse(OccurredAtLocalTime, out var t))
+                t = new TimeOnly(12, 0);
+
+            var local = new DateTime(
+                OccurredAtLocalDate.Year,
+                OccurredAtLocalDate.Month,
+                OccurredAtLocalDate.Day,
+                t.Hour,
+                t.Minute,
+                0,
+                DateTimeKind.Local);
+
+            return local.ToUniversalTime();
+        }
+    }
+}
+

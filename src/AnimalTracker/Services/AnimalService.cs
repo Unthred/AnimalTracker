@@ -66,6 +66,34 @@ public sealed class AnimalService(ApplicationDbContext db, CurrentUserService cu
         return entity;
     }
 
+    public async Task<Animal> UpdateAsync(
+        int id,
+        int speciesId,
+        string? displayName,
+        string? identifyingFeatures,
+        string? notes,
+        AnimalStatus status = AnimalStatus.Active,
+        CancellationToken cancellationToken = default)
+    {
+        var userId = await currentUser.GetRequiredUserIdAsync(cancellationToken);
+        var entity = await db.Animals.FirstOrDefaultAsync(
+            x => x.Id == id && x.OwnerUserId == userId,
+            cancellationToken);
+
+        if (entity is null)
+            throw new InvalidOperationException("Animal not found.");
+
+        entity.SpeciesId = speciesId;
+        entity.DisplayName = string.IsNullOrWhiteSpace(displayName) ? null : displayName.Trim();
+        entity.IdentifyingFeatures = string.IsNullOrWhiteSpace(identifyingFeatures) ? null : identifyingFeatures.Trim();
+        entity.Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+        entity.Status = status;
+        entity.UpdatedAtUtc = DateTime.UtcNow;
+
+        await db.SaveChangesAsync(cancellationToken);
+        return entity;
+    }
+
     public async Task DeleteAsync(int id, CancellationToken cancellationToken = default)
     {
         var userId = await currentUser.GetRequiredUserIdAsync(cancellationToken);
@@ -76,6 +104,7 @@ public sealed class AnimalService(ApplicationDbContext db, CurrentUserService cu
         if (entity is null)
             throw new InvalidOperationException("Animal not found.");
 
+        // Keep sightings (history) but remove the association to this profile.
         await db.Sightings
             .Where(s => s.OwnerUserId == userId && s.AnimalId == id)
             .ExecuteUpdateAsync(

@@ -22,6 +22,7 @@
         <div class="grid min-w-0 grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8">
             <UIField Label="When" For="occurredAt">
                 <div class="min-w-0">
+                    <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Date</span>
                     <InputDate id="occurredAt" @bind-Value="model.OccurredAtLocalDate"
                                class="block w-full min-w-0 max-w-full rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:focus:ring-slate-800/80" />
                     <ValidationMessage For="() => model.OccurredAtLocalDate" />
