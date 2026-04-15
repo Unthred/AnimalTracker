@@ -191,24 +191,44 @@ static async Task EnsureSqliteUserSettingsColumnsAsync(ApplicationDbContext db)
     // Defensive schema repair:
     // We had earlier migrations created/removed during development; a local DB can end up missing
     // new columns even if the migration history looks "up to date". These ALTERs are safe to run
-    // on SQLite at startup: they either succeed or we ignore "duplicate column" errors.
+    // on SQLite at startup, but we avoid attempting ALTER when the column already exists because
+    // EF logs those failures loudly even if we catch the exception.
     if (!db.Database.IsSqlite())
         return;
 
-    async Task TryAddAsync(string sql)
+    static async Task<HashSet<string>> GetColumnNamesAsync(ApplicationDbContext db)
     {
-        try
+        await using var conn = db.Database.GetDbConnection();
+        if (conn.State != System.Data.ConnectionState.Open)
+            await conn.OpenAsync();
+
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = "PRAGMA table_info('UserSettings');";
+
+        var cols = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
         {
-            await db.Database.ExecuteSqlRawAsync(sql);
+            // PRAGMA table_info columns: cid, name, type, notnull, dflt_value, pk
+            var name = reader["name"]?.ToString();
+            if (!string.IsNullOrWhiteSpace(name))
+                cols.Add(name);
         }
-        catch
-        {
-            // Ignore (e.g. column already exists).
-        }
+
+        return cols;
     }
 
-    await TryAddAsync("ALTER TABLE UserSettings ADD COLUMN BackgroundImageRelativePath TEXT NULL");
-    await TryAddAsync("ALTER TABLE UserSettings ADD COLUMN ThemeMode TEXT NOT NULL DEFAULT 'system'");
+    async Task TryAddAsync(string columnName, string sql)
+    {
+        var cols = await GetColumnNamesAsync(db);
+        if (cols.Contains(columnName))
+            return;
+
+        await db.Database.ExecuteSqlRawAsync(sql);
+    }
+
+    await TryAddAsync("BackgroundImageRelativePath", "ALTER TABLE UserSettings ADD COLUMN BackgroundImageRelativePath TEXT NULL");
+    await TryAddAsync("ThemeMode", "ALTER TABLE UserSettings ADD COLUMN ThemeMode TEXT NOT NULL DEFAULT 'system'");
 }
 
 static async Task EnsureAdminUserAsync(IServiceProvider sp)
