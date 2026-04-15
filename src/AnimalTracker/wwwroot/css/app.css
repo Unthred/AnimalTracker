@@ -114,6 +114,18 @@
     font-weight: 700;
   }
 
+  /* Photo grid affordances (avoid relying on generated group-hover utilities). */
+  .photo-tile-delete {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .photo-tile:hover .photo-tile-delete,
+  .photo-tile:focus-within .photo-tile-delete {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
   html.dark .app-nav-link:hover {
     background-color: color-mix(in srgb, var(--accent) 22%, rgb(2 6 23)); /* slate-950 */
   }
@@ -190,11 +202,9 @@
   }
 
   /* Keep accent color in dark mode too (don't override to slate-100). */
-  @media (prefers-color-scheme: dark) {
-    .btn-primary {
-      border: 1px solid rgb(51 65 85); /* slate-700 */
-      color: white;
-    }
+  html.dark .btn-primary {
+    border: 1px solid rgb(51 65 85); /* slate-700 */
+    color: white;
   }
 
   /* Native form controls used by our Tailwind-first pages */
