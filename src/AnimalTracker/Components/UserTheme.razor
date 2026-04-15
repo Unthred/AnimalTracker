@@ -19,17 +19,13 @@
 {
     private string? accent;
     private string? lastAppliedThemeMode;
+    private string? lastAppliedUserId;
 
     protected override async Task OnInitializedAsync()
     {
         Prefs.Changed += OnPrefsChanged;
-
-        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
-        if (auth.User.Identity?.IsAuthenticated == true)
-        {
-            var s = await Settings.GetOrCreateAsync();
-            Prefs.Apply(s);
-        }
+        AuthStateProvider.AuthenticationStateChanged += OnAuthenticationStateChanged;
+        await RefreshFromAuthenticationStateAsync(await AuthStateProvider.GetAuthenticationStateAsync());
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -49,12 +45,43 @@
         _ = InvokeAsync(StateHasChanged);
     }
 
+    private void OnAuthenticationStateChanged(Task<AuthenticationState> authTask) =>
+        _ = InvokeAsync(async () =>
+        {
+            var auth = await authTask;
+            await RefreshFromAuthenticationStateAsync(auth);
+            StateHasChanged();
+        });
+
+    private async Task RefreshFromAuthenticationStateAsync(AuthenticationState auth)
+    {
+        if (auth.User.Identity?.IsAuthenticated != true)
+        {
+            lastAppliedUserId = null;
+            return;
+        }
+
+        var userId = auth.User.FindFirst("sub")?.Value
+            ?? auth.User.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")?.Value
+            ?? auth.User.Identity?.Name
+            ?? "__authenticated__";
+
+        if (string.Equals(lastAppliedUserId, userId, StringComparison.Ordinal))
+            return;
+
+        var s = await Settings.GetOrCreateAsync();
+        Prefs.Apply(s);
+        accent = Prefs.AccentColorHex;
+        lastAppliedUserId = userId;
+    }
+
     private ValueTask ApplyThemeAsync() =>
         JS.InvokeVoidAsync("animalTrackerSetTheme", Prefs.ThemeMode);
 
     public void Dispose()
     {
         Prefs.Changed -= OnPrefsChanged;
+        AuthStateProvider.AuthenticationStateChanged -= OnAuthenticationStateChanged;
     }
 }
 

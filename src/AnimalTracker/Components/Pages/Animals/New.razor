@@ -35,7 +35,9 @@
         </UIField>
 
         <UIField Label="Name (optional)" For="displayName">
-            <InputText id="displayName" class="w-full min-w-0 px-3 py-2.5" @bind-Value="model.DisplayName" />
+            <InputText id="displayName" type="text"
+                       class="w-full min-w-0 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80"
+                       @bind-Value="model.DisplayName" />
         </UIField>
 
         <UIField Label="Identifying features" For="features">

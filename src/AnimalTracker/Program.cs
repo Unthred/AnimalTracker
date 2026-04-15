@@ -9,6 +9,8 @@ using AnimalTracker.State;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Localization;
+using System.Globalization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -79,6 +81,17 @@ builder.Services.AddScoped<UserPreferencesState>();
 builder.Services.AddScoped<AdminUserService>();
 builder.Services.AddScoped<AppSettingsService>();
 
+var ukCulture = new CultureInfo("en-GB");
+CultureInfo.DefaultThreadCurrentCulture = ukCulture;
+CultureInfo.DefaultThreadCurrentUICulture = ukCulture;
+
+builder.Services.Configure<RequestLocalizationOptions>(options =>
+{
+    options.DefaultRequestCulture = new RequestCulture(ukCulture);
+    options.SupportedCultures = [ukCulture];
+    options.SupportedUICultures = [ukCulture];
+});
+
 var app = builder.Build();
 
 // Ensure schema + seed data exist for dev/MVP.
@@ -115,6 +128,7 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
     KnownIPNetworks = { },
     KnownProxies = { }
 });
+app.UseRequestLocalization();
 if (app.Environment.IsDevelopment())
 {
     app.UseMigrationsEndPoint();

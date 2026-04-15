@@ -20,18 +20,19 @@
 
 <PageTitle>Register</PageTitle>
 
-<div class="pointer-events-none fixed inset-0 -z-10 bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900"></div>
+@if (hasDefaultAuthImage)
+{
+    <div class="pointer-events-none fixed inset-0 -z-20 bg-cover bg-center bg-no-repeat" style="@DefaultAuthBackgroundStyle"></div>
+    <div class="pointer-events-none fixed inset-0 -z-10 bg-slate-50/84 dark:bg-slate-950/82"></div>
+}
+else
+{
+    <div class="pointer-events-none fixed inset-0 -z-20 bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900"></div>
+}
 <div class="pointer-events-none fixed inset-0 -z-10 opacity-60 [background:radial-gradient(600px_circle_at_20%_10%,color-mix(in_srgb,var(--accent)_18%,transparent),transparent_55%),radial-gradient(600px_circle_at_80%_20%,rgba(99,102,241,0.18),transparent_55%)]"></div>
 
 <div class="mx-auto w-full max-w-xl py-10 sm:py-14">
     <UIPageHeader Title="Create account" Description="Register to start tracking sightings." />
-
-    @if (hasDefaultAuthImage)
-    {
-        <UICard Class="mb-6 overflow-hidden p-0">
-            <img src="@($"/app/default-auth-image?t={defaultAuthImageStamp}")" alt="AnimalTracker welcome image" class="h-40 w-full object-cover sm:h-56" />
-        </UICard>
-    }
 
     <UICard>
         <StatusMessage Message="@Message" />
@@ -81,17 +82,14 @@
 <script>
     (() => {
         try {
-            const readCookie = (name) => {
-                const prefix = name + '=';
-                for (const part of document.cookie.split(';')) {
-                    const value = part.trim();
-                    if (value.startsWith(prefix)) return decodeURIComponent(value.substring(prefix.length));
-                }
-                return null;
-            };
-
-            if (!readCookie('animaltracker_theme')) {
-                document.cookie = `animaltracker_theme=${encodeURIComponent('@defaultThemeMode')}; Path=/; Max-Age=${180 * 24 * 60 * 60}; SameSite=Lax`;
+            const mode = ('@defaultThemeMode' || 'system').toLowerCase();
+            if (window.animalTrackerSetTheme) {
+                window.animalTrackerSetTheme(mode);
+            } else {
+                const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                const dark = mode === 'dark' || (mode === 'system' && prefersDark);
+                document.documentElement.classList.toggle('dark', !!dark);
+                document.cookie = `animaltracker_theme=${encodeURIComponent(mode)}; Path=/; Max-Age=${180 * 24 * 60 * 60}; SameSite=Lax`;
             }
         } catch { /* ignore */ }
     })();
@@ -102,6 +100,7 @@
     private bool hasDefaultAuthImage;
     private long defaultAuthImageStamp;
     private string defaultThemeMode = "system";
+    private string DefaultAuthBackgroundStyle => $"""background-image: url('/app/default-auth-image?t={defaultAuthImageStamp}');""";
     private bool canBecomeAdmin;
 
     [SupplyParameterFromForm]
