@@ -1,5 +1,6 @@
 @page "/animals/{Id:int}"
 @rendermode InteractiveServer
+@implements IDisposable
 
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize]
@@ -8,6 +9,8 @@
 @using AnimalTracker.Data.Entities
 @inject AnimalService Animals
 @inject NavigationManager Nav
+@inject AnimalTracker.Services.SightingService Sightings
+@inject AnimalTracker.State.UserPreferencesState Prefs
 
 <PageTitle>Animal</PageTitle>
 
@@ -25,6 +28,7 @@ else
                   Description="@animal.Species.Name">
         <Actions>
             <UIButton Href="/animals" Variant="UiButtonVariant.Outline">Back to list</UIButton>
+            <UIButton Href="@($"/animals/{Id}/edit")" Variant="UiButtonVariant.Outline">Edit</UIButton>
         </Actions>
     </UIPageHeader>
 
@@ -73,14 +77,29 @@ else
     private Animal? animal;
     private bool showDeleteConfirm;
     private string? deleteError;
+    private int? animalPhotoId;
+    private IDisposable? backgroundScope;
 
     protected override async Task OnParametersSetAsync()
     {
         loading = true;
         showDeleteConfirm = false;
         deleteError = null;
+        animalPhotoId = null;
         animal = await Animals.GetAsync(Id);
+        if (animal is not null)
+            animalPhotoId = await Sightings.GetLatestPhotoIdForAnimalAsync(Id);
+
+        backgroundScope?.Dispose();
+        backgroundScope = null;
+        if (animalPhotoId is not null)
+            backgroundScope = Prefs.UseTemporaryBackground($"/photos/{animalPhotoId}");
         loading = false;
+    }
+
+    public void Dispose()
+    {
+        backgroundScope?.Dispose();
     }
 
     private void CancelDelete()

@@ -1,5 +1,6 @@
 @page "/sightings/{Id:int}"
 @rendermode InteractiveServer
+@implements IDisposable
 
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize]
@@ -11,6 +12,7 @@
 @inject ApplicationDbContext Db
 @inject PhotoStorageService Storage
 @inject NavigationManager Nav
+@inject AnimalTracker.State.UserPreferencesState Prefs
 
 <PageTitle>Sighting</PageTitle>
 
@@ -28,6 +30,7 @@ else
                   Description="@($"{sighting.OccurredAtUtc.ToLocalTime():f} · {sighting.Location.Name}")">
         <Actions>
             <UIButton Href="/" Variant="UiButtonVariant.Outline">Back to timeline</UIButton>
+            <UIButton Href="@($"/sightings/{Id}/edit")" Variant="UiButtonVariant.Outline">Edit</UIButton>
         </Actions>
     </UIPageHeader>
 
@@ -94,6 +97,7 @@ else
     private string? uploadError;
     private bool showDeleteConfirm;
     private string? deleteError;
+    private IDisposable? backgroundScope;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -101,7 +105,18 @@ else
         showDeleteConfirm = false;
         deleteError = null;
         sighting = await Sightings.GetAsync(Id);
+        backgroundScope?.Dispose();
+        backgroundScope = null;
+        if (sighting?.Photos.Count > 0)
+        {
+            backgroundScope = Prefs.UseTemporaryBackground($"/photos/{sighting.Photos[0].Id}");
+        }
         loading = false;
+    }
+
+    public void Dispose()
+    {
+        backgroundScope?.Dispose();
     }
 
     private void CancelDelete()
