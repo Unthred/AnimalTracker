@@ -13,6 +13,7 @@ public sealed record StoredPhoto(
 public sealed class PhotoStorageService(IWebHostEnvironment env, CurrentUserService currentUser)
 {
     public const long DefaultMaxUploadBytes = 10 * 1024 * 1024; // 10 MB
+    private const long BytesPerMb = 1024 * 1024;
 
     public async Task<StoredPhoto> SaveAsync(
         IBrowserFile file,
@@ -117,7 +118,7 @@ public sealed class PhotoStorageService(IWebHostEnvironment env, CurrentUserServ
         if (file.Size <= 0)
             throw new ArgumentException("File is empty.", nameof(file));
         if (file.Size > maxBytes)
-            throw new ArgumentException($"File too large (max {maxBytes} bytes).", nameof(file));
+            throw new ArgumentException($"Background image is too large. Max {(maxBytes / BytesPerMb)} MB.", nameof(file));
 
         var userId = await currentUser.GetRequiredUserIdAsync(cancellationToken);
         var dir = Path.Combine(env.ContentRootPath, "App_Data", "backgrounds", userId);

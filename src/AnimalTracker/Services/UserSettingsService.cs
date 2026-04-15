@@ -25,6 +25,7 @@ public sealed class UserSettingsService(ApplicationDbContext db, CurrentUserServ
             AccentColorHex = "#0f172a",
             CompactMode = false,
             TimelinePageSize = 50,
+            ThemeMode = "system",
             CreatedAtUtc = now,
             UpdatedAtUtc = now
         };
@@ -38,6 +39,7 @@ public sealed class UserSettingsService(ApplicationDbContext db, CurrentUserServ
         string accentColorHex,
         bool compactMode,
         int timelinePageSize,
+        string themeMode,
         CancellationToken cancellationToken = default)
     {
         var settings = await GetOrCreateAsync(cancellationToken);
@@ -49,9 +51,14 @@ public sealed class UserSettingsService(ApplicationDbContext db, CurrentUserServ
         if (timelinePageSize is not (25 or 50 or 100))
             throw new ArgumentOutOfRangeException(nameof(timelinePageSize), "Timeline page size must be 25, 50, or 100.");
 
+        themeMode = (themeMode ?? "").Trim().ToLowerInvariant();
+        if (themeMode is not ("system" or "light" or "dark"))
+            throw new ArgumentOutOfRangeException(nameof(themeMode), "Theme mode must be system, light, or dark.");
+
         settings.AccentColorHex = accentColorHex;
         settings.CompactMode = compactMode;
         settings.TimelinePageSize = timelinePageSize;
+        settings.ThemeMode = themeMode;
         settings.UpdatedAtUtc = DateTime.UtcNow;
 
         await db.SaveChangesAsync(cancellationToken);

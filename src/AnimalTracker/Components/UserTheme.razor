@@ -6,6 +6,7 @@
 @inject UserSettingsService Settings
 @inject AuthenticationStateProvider AuthStateProvider
 @inject AnimalTracker.State.UserPreferencesState Prefs
+@inject IJSRuntime JS
 
 @if (!string.IsNullOrWhiteSpace(accent))
 {
@@ -17,6 +18,7 @@
 @code
 {
     private string? accent;
+    private string? lastAppliedThemeMode;
 
     protected override async Task OnInitializedAsync()
     {
@@ -30,11 +32,25 @@
         }
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // JS interop is only valid after interactive render begins (not during prerender).
+        // Re-apply theme on navigation/rerenders if needed.
+        if (lastAppliedThemeMode != Prefs.ThemeMode)
+        {
+            await ApplyThemeAsync();
+            lastAppliedThemeMode = Prefs.ThemeMode;
+        }
+    }
+
     private void OnPrefsChanged()
     {
         accent = Prefs.AccentColorHex;
         _ = InvokeAsync(StateHasChanged);
     }
+
+    private ValueTask ApplyThemeAsync() =>
+        JS.InvokeVoidAsync("animalTrackerSetTheme", Prefs.ThemeMode);
 
     public void Dispose()
     {

@@ -49,6 +49,14 @@
             </UIField>
         </div>
 
+        <UIField Label="Theme" For="themeMode" Hint="Choose Light, Dark, or follow your system setting.">
+            <select id="themeMode" class="w-full max-w-xs min-w-0 px-3 py-2.5" @bind="model.ThemeMode">
+                <option value="system">Follow system</option>
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+            </select>
+        </UIField>
+
         <UIField Label="Compact layout" For="compact"
                  Hint="After you save: less padding in the main column and inside cards, slightly smaller page titles, and denser rows on Timeline and Animals. Visit Timeline before and after saving to see the clearest difference.">
             <label for="compact"
@@ -68,7 +76,7 @@
     <p class="text-sm leading-relaxed text-slate-600 dark:text-slate-300">Optional wallpaper behind the app (JPEG, PNG, GIF, or WebP, max 5 MB). A light scrim keeps text readable.</p>
     <div class="mt-4 flex min-w-0 flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center">
         <InputFile OnChange="UploadBackgroundAsync" accept="image/jpeg,image/png,image/gif,image/webp,.jpg,.jpeg,.png,.gif,.webp"
-                   class="block w-full min-w-0 cursor-pointer rounded-xl border border-dashed border-slate-200/90 bg-slate-50/50 px-4 py-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-950/50 dark:text-slate-300" />
+                   class="block w-full min-w-0 cursor-pointer rounded-xl border border-dashed border-slate-200/90 bg-slate-50/50 px-4 py-3 text-sm text-slate-600 shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950/50 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-950/60 file:mr-4 file:cursor-pointer file:rounded-lg file:border-0 file:bg-[var(--accent)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white file:shadow-sm file:transition file:duration-200 hover:file:brightness-[0.96]" />
         @if (hasBackground)
         {
             <UIButton Variant="UiButtonVariant.Outline" @onclick="ClearBackgroundAsync">Remove background</UIButton>
@@ -195,6 +203,7 @@
         model.AccentColorHex = s.AccentColorHex;
         model.CompactMode = s.CompactMode;
         model.TimelinePageSize = s.TimelinePageSize;
+        model.ThemeMode = s.ThemeMode;
         hasBackground = !string.IsNullOrWhiteSpace(s.BackgroundImageRelativePath);
     }
 
@@ -222,10 +231,11 @@
         message = null;
         try
         {
-            var saved = await Settings.UpdateAsync(model.AccentColorHex, model.CompactMode, model.TimelinePageSize);
+            var saved = await Settings.UpdateAsync(model.AccentColorHex, model.CompactMode, model.TimelinePageSize, model.ThemeMode);
             model.AccentColorHex = saved.AccentColorHex;
             model.CompactMode = saved.CompactMode;
             model.TimelinePageSize = saved.TimelinePageSize;
+            model.ThemeMode = saved.ThemeMode;
             Prefs.Apply(saved);
             hasBackground = !string.IsNullOrWhiteSpace(saved.BackgroundImageRelativePath);
             message = "Saved.";
@@ -245,10 +255,16 @@
             if (file is null)
                 return;
 
+            // Upload is persisted immediately so the wallpaper can apply without requiring "Save preferences".
             var saved = await Settings.SetBackgroundImageAsync(file);
             Prefs.Apply(saved);
             hasBackground = true;
             bgMessage = "Background image updated.";
+        }
+        catch (ArgumentException ex) when (ex.ParamName == "file")
+        {
+            // User-friendly upload failures (size/type/empty)
+            bgMessage = $"Error: {ex.Message}";
         }
         catch (Exception ex)
         {
@@ -339,5 +355,8 @@
         public bool CompactMode { get; set; }
 
         public int TimelinePageSize { get; set; } = 50;
+
+        [System.ComponentModel.DataAnnotations.Required]
+        public string ThemeMode { get; set; } = "system";
     }
 }

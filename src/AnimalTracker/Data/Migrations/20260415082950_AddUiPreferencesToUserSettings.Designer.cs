@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace AnimalTracker.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20260414220116_AddBackgroundImageToUserSettings")]
-    partial class AddBackgroundImageToUserSettings
+    [Migration("20260415082950_AddUiPreferencesToUserSettings")]
+    partial class AddUiPreferencesToUserSettings
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -313,6 +313,11 @@ namespace AnimalTracker.Data.Migrations
                     b.Property<string>("OwnerUserId")
                         .IsRequired()
                         .HasMaxLength(450)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ThemeMode")
+                        .IsRequired()
+                        .HasMaxLength(16)
                         .HasColumnType("TEXT");
 
                     b.Property<int>("TimelinePageSize")

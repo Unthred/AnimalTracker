@@ -312,6 +312,11 @@ namespace AnimalTracker.Migrations
                         .HasMaxLength(450)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ThemeMode")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("TimelinePageSize")
                         .HasColumnType("INTEGER");
 

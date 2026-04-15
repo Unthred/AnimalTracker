@@ -1,5 +1,13 @@
 ﻿<!DOCTYPE html>
-<html lang="en">
+@inject IHttpContextAccessor HttpContextAccessor
+@{
+    // Enhanced navigation can replace the <html> element from server responses.
+    // If the response doesn't include the `dark` class, the browser will drop it even if JS set it earlier.
+    // We seed the class from the theme cookie so navigation stays visually consistent.
+    var themeCookie = HttpContextAccessor.HttpContext?.Request.Cookies["animaltracker_theme"];
+    var initialHtmlClass = string.Equals(themeCookie, "dark", StringComparison.OrdinalIgnoreCase) ? "dark" : "";
+}
+<html lang="en" class="@initialHtmlClass">
 
 <head>
     <meta charset="utf-8" />
@@ -17,11 +25,47 @@
 </head>
 
 <body>
+    <AppBackground />
     <UserTheme />
     <Routes />
     <ReconnectModal />
     <script src="@Assets["_framework/blazor.web.js"]"></script>
     <script src="@Assets["Components/Account/Shared/PasskeySubmit.razor.js"]" type="module"></script>
+    <script>
+        // Theme mode: "system" | "light" | "dark"
+        // Tailwind uses darkMode: 'class', so we toggle documentElement.classList.
+        const animalTrackerThemeCookieName = 'animaltracker_theme';
+        const animalTrackerReadCookie = (name) => {
+            try {
+                const prefix = name + '=';
+                const parts = document.cookie.split(';');
+                for (const p of parts) {
+                    const s = p.trim();
+                    if (s.startsWith(prefix)) return decodeURIComponent(s.substring(prefix.length));
+                }
+            } catch { /* ignore */ }
+            return null;
+        };
+        const animalTrackerWriteCookie = (name, value) => {
+            try {
+                // 180 days
+                document.cookie = `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${180 * 24 * 60 * 60}; SameSite=Lax`;
+            } catch { /* ignore */ }
+        };
+        window.animalTrackerSetTheme = (mode) => {
+            try {
+                const m = (mode || 'system').toLowerCase();
+                const root = document.documentElement;
+                const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                const dark = (m === 'dark') || (m === 'system' && prefersDark);
+                root.classList.toggle('dark', !!dark);
+                // Persist so full-page navigations keep the same theme.
+                animalTrackerWriteCookie(animalTrackerThemeCookieName, m);
+            } catch { /* ignore */ }
+        };
+        // Apply immediately from cookie to avoid a flash of wrong theme on full reloads.
+        window.animalTrackerSetTheme(animalTrackerReadCookie(animalTrackerThemeCookieName) || 'system');
+    </script>
 </body>
 
 </html>

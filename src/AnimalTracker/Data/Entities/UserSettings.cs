@@ -28,6 +28,12 @@ public sealed class UserSettings
     [MaxLength(512)]
     public string? BackgroundImageRelativePath { get; set; }
 
+    /// <summary>
+    /// Theme preference: "system", "light", or "dark".
+    /// </summary>
+    [Required, MaxLength(16)]
+    public string ThemeMode { get; set; } = "system";
+
     public DateTime CreatedAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
 }

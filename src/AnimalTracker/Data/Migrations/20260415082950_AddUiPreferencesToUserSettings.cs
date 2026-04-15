@@ -5,7 +5,7 @@
 namespace AnimalTracker.Data.Migrations
 {
     /// <inheritdoc />
-    public partial class AddBackgroundImageToUserSettings : Migration
+    public partial class AddUiPreferencesToUserSettings : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -16,11 +16,23 @@ namespace AnimalTracker.Data.Migrations
                 type: "TEXT",
                 maxLength: 512,
                 nullable: true);
+
+            migrationBuilder.AddColumn<string>(
+                name: "ThemeMode",
+                table: "UserSettings",
+                type: "TEXT",
+                maxLength: 16,
+                nullable: false,
+                defaultValue: "system");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropColumn(
+                name: "ThemeMode",
+                table: "UserSettings");
+
             migrationBuilder.DropColumn(
                 name: "BackgroundImageRelativePath",
                 table: "UserSettings");

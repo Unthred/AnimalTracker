@@ -13,8 +13,14 @@ public sealed class UserPreferencesState
     /// <summary>Relative path under content root, when set.</summary>
     public string? BackgroundImageRelativePath { get; private set; }
 
+    /// <summary>"system", "light", or "dark"</summary>
+    public string ThemeMode { get; private set; } = "system";
+
     /// <summary>Bumps when preferences change so background URL cache-busts.</summary>
     public int UiStamp { get; private set; }
+
+    private Guid? temporaryBackgroundToken;
+    public string? TemporaryBackgroundUrl { get; private set; }
 
     public void Apply(UserSettings settings)
     {
@@ -22,8 +28,42 @@ public sealed class UserPreferencesState
         CompactMode = settings.CompactMode;
         TimelinePageSize = settings.TimelinePageSize;
         BackgroundImageRelativePath = settings.BackgroundImageRelativePath;
+        ThemeMode = string.IsNullOrWhiteSpace(settings.ThemeMode) ? "system" : settings.ThemeMode;
         UiStamp++;
         Changed?.Invoke();
+    }
+
+    /// <summary>
+    /// Temporarily overrides the app background (e.g. per-page hero wallpaper). Dispose to revert.
+    /// </summary>
+    public IDisposable UseTemporaryBackground(string url)
+    {
+        // Token ensures "last writer wins" and that a stale Dispose() can't clear a newer override.
+        var token = Guid.NewGuid();
+        temporaryBackgroundToken = token;
+        TemporaryBackgroundUrl = url;
+        Changed?.Invoke();
+        return new TemporaryBackgroundScope(this, token);
+    }
+
+    private void ClearTemporaryBackground(Guid token)
+    {
+        if (temporaryBackgroundToken != token)
+            return;
+        temporaryBackgroundToken = null;
+        TemporaryBackgroundUrl = null;
+        Changed?.Invoke();
+    }
+
+    private sealed class TemporaryBackgroundScope(UserPreferencesState prefs, Guid token) : IDisposable
+    {
+        private bool disposed;
+        public void Dispose()
+        {
+            if (disposed) return;
+            disposed = true;
+            prefs.ClearTemporaryBackground(token);
+        }
     }
 }
 
