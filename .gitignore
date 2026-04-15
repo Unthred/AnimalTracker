@@ -35,3 +35,6 @@ src/AnimalTracker/App_Data/
 **/secrets.json
 **/appsettings.*.local.json
 
+# Container environment overrides (contains secrets)
+.env
+

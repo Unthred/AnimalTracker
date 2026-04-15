@@ -5,18 +5,17 @@ services:
       dockerfile: Dockerfile
     container_name: animaltracker
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
-      # Set this to your public hostname (matches AllowedHosts)
-      - ASPNETCORE_ENVIRONMENT=Production
-      # Optional: bootstrap an admin user on startup
-      - AnimalTracker__AdminEmail=admin@example.com
-      # Choose a strong password before deploying (or remove both lines to skip bootstrap)
-      - AnimalTracker__AdminPassword=CHANGE_ME_STRONG_PASSWORD
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      AnimalTracker__AdminEmail: ${ANIMALTRACKER_ADMIN_EMAIL:-}
+      AnimalTracker__AdminPassword: ${ANIMALTRACKER_ADMIN_PASSWORD:-}
     ports:
       # For HAProxy backend, map an internal port on UnRaid host
-      - "8085:8080"
+      - "${APP_PORT:-8085}:8080"
     volumes:
       # Persist DB + uploaded files + data protection keys
-      - ./data/Data:/app/Data
-      - ./data/App_Data:/app/App_Data
+      - ${DATA_ROOT:-./data}/Data:/app/Data
+      - ${DATA_ROOT:-./data}/App_Data:/app/App_Data
 

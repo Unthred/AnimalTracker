@@ -23,26 +23,38 @@ dotnet run --project .\src\AnimalTracker\AnimalTracker.csproj
 
 ## Deploy (UnRaid + OPNsense HAProxy)
 
-### Container
-From the repo root:
+### Build on UnRaid (no Docker required on this PC)
+1. Copy or clone this repo onto UnRaid (for example under `/mnt/user/appdata/animaltracker-src`).
+2. In the repo root, create your environment file:
+
+```bash
+cp .env.example .env
+```
+
+3. Edit `.env` and set:
+- `APP_PORT` (default `8085`)
+- `DATA_ROOT` (default `./data`, or absolute `/mnt/user/appdata/animaltracker`)
+- optional first-run admin bootstrap:
+  - `ANIMALTRACKER_ADMIN_EMAIL`
+  - `ANIMALTRACKER_ADMIN_PASSWORD`
+
+4. Start the container from repo root:
 
 ```bash
 docker compose up -d --build
 ```
 
 Persisted paths (from `docker-compose.yml`):
-- `./data/Data` → `/app/Data` (SQLite DB)
-- `./data/App_Data` → `/app/App_Data` (photos, backgrounds, data protection keys)
+- `${DATA_ROOT}/Data` → `/app/Data` (SQLite DB)
+- `${DATA_ROOT}/App_Data` → `/app/App_Data` (photos, backgrounds, data protection keys)
 
 ### Admin account
-Set these environment variables (container) for automatic admin creation on startup:
-- `AnimalTracker__AdminEmail`
-- `AnimalTracker__AdminPassword`
-
-Then sign in and visit `/admin/users`.
+- If `ANIMALTRACKER_ADMIN_EMAIL` and `ANIMALTRACKER_ADMIN_PASSWORD` are set in `.env`, the admin user is created/ensured on startup.
+- If left blank, register the first account in the UI; it becomes admin automatically.
+- Admin dashboard route: `/admin`.
 
 ### Reverse proxy
-Create `animaltracker.yeradonkey.com` in HAProxy and forward to the host port you map (default `8085`).
+Create `animaltracker.yeradonkey.com` in HAProxy and forward to the host port from `.env` (`APP_PORT`, default `8085`).
 Ensure HAProxy forwards:
 - `X-Forwarded-Proto: https`
 - `X-Forwarded-For`
