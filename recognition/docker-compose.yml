@@ -1,0 +1,16 @@
+# Example Unraid / local compose. Point AnimalTracker appsettings Recognition:BaseUrl to http://animal-recognition-api:8080 (same Docker network) or http://host:18080 from host.
+services:
+  animal-recognition-api:
+    build: .
+    container_name: animal-recognition-api
+    restart: unless-stopped
+    ports:
+      - "18080:8080"
+    environment:
+      ASPNETCORE_URLS: "http://0.0.0.0:8080"
+      API_KEY: ""
+      MODEL_CLASSIFIER_PATH: "/models/species_classifier.onnx"
+      MODEL_VERSION: "wildlife-v1"
+    volumes:
+      - /mnt/user/appdata/animal-recognition/models:/models:ro
+      - /mnt/user/appdata/animal-recognition/cache:/cache

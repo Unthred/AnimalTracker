@@ -58,6 +58,8 @@
     <ReconnectModal />
     <script src="@Assets["_framework/blazor.web.js"]"
             onerror="this.onerror=null;this.src='@Assets["_framework/blazor.server.js"]'"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous"></script>
+    <script src="/js/stats-charts.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="/js/sightings-map.js"></script>
     <script src="@Assets["Components/Account/Shared/PasskeySubmit.razor.js"]" type="module"></script>
@@ -166,6 +168,23 @@
                     reject(e?.message || "Unable to get current position.");
                 }
             });
+        };
+        window.animalTrackerGetLocalTimestamp = () => {
+            try {
+                const d = new Date();
+                let s = d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'medium', timeZoneName: 'long' });
+                s = s
+                    .replace(/\bBritish Summer Time\b/gi, 'BST')
+                    .replace(/\bGreenwich Mean Time\b/gi, 'GMT')
+                    .replace(/\bCoordinated Universal Time\b/gi, 'UTC');
+                return s;
+            } catch {
+                try {
+                    return new Date().toString();
+                } catch {
+                    return '';
+                }
+            }
         };
         window.animalTrackerCopyText = async (value) => {
             try {

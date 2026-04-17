@@ -12,6 +12,8 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Animal> Animals => Set<Animal>();
     public DbSet<Sighting> Sightings => Set<Sighting>();
     public DbSet<SightingPhoto> SightingPhotos => Set<SightingPhoto>();
+    public DbSet<PhotoImportBatch> PhotoImportBatches => Set<PhotoImportBatch>();
+    public DbSet<PhotoImportItem> PhotoImportItems => Set<PhotoImportItem>();
     public DbSet<UserSettings> UserSettings => Set<UserSettings>();
     public DbSet<AppSettings> AppSettings => Set<AppSettings>();
 
@@ -63,7 +65,21 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         builder.Entity<SightingPhoto>(e =>
         {
             e.HasIndex(x => x.SightingId);
+            e.HasIndex(x => x.ContentSha256Hex);
             e.Property(x => x.CreatedAtUtc).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        });
+
+        builder.Entity<PhotoImportBatch>(e =>
+        {
+            e.HasIndex(x => new { x.OwnerUserId, x.CreatedAtUtc });
+            e.Property(x => x.CreatedAtUtc).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        });
+
+        builder.Entity<PhotoImportItem>(e =>
+        {
+            e.HasIndex(x => x.BatchId);
+            e.HasIndex(x => x.ContentSha256Hex);
+            e.HasIndex(x => x.SightingId);
         });
 
         builder.Entity<UserSettings>(e =>

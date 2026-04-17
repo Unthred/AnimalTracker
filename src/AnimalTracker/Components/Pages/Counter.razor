@@ -1,15 +1,21 @@
 ﻿@page "/stats"
 @rendermode InteractiveServer
+@implements IAsyncDisposable
 
+@using System.Globalization
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.JSInterop
 @attribute [Authorize]
 
 @using AnimalTracker.Services
+@using AnimalTracker.Data.Entities
 @inject TerritoryInsightsService Insights
+@inject StatsService Stats
+@inject IJSRuntime JS
 
 <PageTitle>Stats</PageTitle>
 
-<UIPageHeader Title="Territory insights" Description="Core areas, activity windows, and hunting zones inferred from your sightings.">
+<UIPageHeader Title="Stats" Description="Charts, mix breakdowns, and an activity heat map for your sightings.">
     <Actions>
         <UIButton Href="/map" Variant="UiButtonVariant.Outline">Open map</UIButton>
     </Actions>
@@ -32,65 +38,278 @@
 }
 else
 {
+    <div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <StatHighlightCard Title="Sightings"
+                           Value="@summary.TotalSightings.ToString("N0")"
+                           Subtitle="@($"{summary.DistinctSpeciesCount} species")"
+                           AccentBorder="border-l-4 border-sky-500" />
+        <StatHighlightCard Title="Photos"
+                           Value="@summary.TotalPhotos.ToString("N0")"
+                           Subtitle="In selected range"
+                           AccentBorder="border-l-4 border-violet-500" />
+        <StatHighlightCard Title="Geotagged"
+                           Value="@summary.GeotaggedSightings.ToString("N0")"
+                           Subtitle="@GeotaggedSubtitle"
+                           AccentBorder="border-l-4 border-emerald-500" />
+        <StatHighlightCard Title="Linked animals"
+                           Value="@summary.LinkedAnimalSightings.ToString("N0")"
+                           Subtitle="Tied to a profile"
+                           AccentBorder="border-l-4 border-amber-500" />
+        <StatHighlightCard Title="Hunting"
+                           Value="@summary.HuntingSightings.ToString("N0")"
+                           Subtitle="Behavior = hunting"
+                           AccentBorder="border-l-4 border-rose-500" />
+    </div>
+
+    @if (summary.TotalSightings > 0)
+    {
+        <UICard Title="Coverage" Class="mt-6">
+            <div class="grid gap-8 lg:grid-cols-2 lg:items-center">
+                <div class="space-y-5">
+                    <div>
+                        <div class="mb-2 flex items-center justify-between text-xs font-medium text-slate-600 dark:text-slate-400">
+                            <span>Geotagged share</span>
+                            <span class="tabular-nums text-slate-900 dark:text-slate-100">@PercentOf(summary.GeotaggedSightings, summary.TotalSightings)%</span>
+                        </div>
+                        <div class="h-3 overflow-hidden rounded-full bg-slate-200/90 dark:bg-slate-700/90">
+                            <div class="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-[width] duration-500"
+                                 style="width: @(PercentOf(summary.GeotaggedSightings, summary.TotalSightings))%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="mb-2 flex items-center justify-between text-xs font-medium text-slate-600 dark:text-slate-400">
+                            <span>Linked to animals</span>
+                            <span class="tabular-nums text-slate-900 dark:text-slate-100">@PercentOf(summary.LinkedAnimalSightings, summary.TotalSightings)%</span>
+                        </div>
+                        <div class="h-3 overflow-hidden rounded-full bg-slate-200/90 dark:bg-slate-700/90">
+                            <div class="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-500 transition-[width] duration-500"
+                                 style="width: @(PercentOf(summary.LinkedAnimalSightings, summary.TotalSightings))%"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="relative mx-auto h-56 w-full max-w-sm">
+                    <canvas id="@IdCoverage"></canvas>
+                </div>
+            </div>
+        </UICard>
+    }
+
+    <div class="mt-6 grid gap-4 lg:grid-cols-2">
+        @if (summary.SpeciesCounts.Count > 0)
+        {
+            <UICard Title="Species mix">
+                <p class="mb-2 text-xs text-slate-600 dark:text-slate-400">Share of sightings by species (top set).</p>
+                <div class="relative mx-auto h-64 w-full max-w-lg">
+                    <canvas id="@IdSpecies"></canvas>
+                </div>
+            </UICard>
+        }
+        @if (summary.BehaviorCounts.Count > 0)
+        {
+            <UICard Title="Behavior mix">
+                <p class="mb-2 text-xs text-slate-600 dark:text-slate-400">Recorded behaviors in range.</p>
+                <div class="relative h-64 w-full">
+                    <canvas id="@IdBehavior"></canvas>
+                </div>
+            </UICard>
+        }
+    </div>
+
+    @if (summary.DailyCounts.Count > 0)
+    {
+        <UICard Title="Sightings by day (UTC)" Class="mt-6">
+            <p class="mb-2 text-xs text-slate-600 dark:text-slate-400">Daily totals across the selected window.</p>
+            <div class="relative h-72 w-full">
+                <canvas id="@IdDaily"></canvas>
+            </div>
+        </UICard>
+    }
+
+    @if (HeatmapRows.Count > 0)
+    {
+        <UICard Title="Activity heat map (UTC)" Class="mt-6">
+            <p class="mb-3 text-xs text-slate-600 dark:text-slate-400">Calendar grid: stronger cyan = more sightings that day. Weeks start on Monday.</p>
+            <div class="overflow-x-auto">
+                <div class="inline-block min-w-full">
+                    <div class="mb-1 grid grid-cols-7 gap-1 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+                    </div>
+                    @foreach (var row in HeatmapRows)
+                    {
+                        <div class="mb-1 grid grid-cols-7 gap-1">
+                            @foreach (var cell in row)
+                            {
+                                @if (cell.IsPadding)
+                                {
+                                    <div class="aspect-square min-h-[2rem] rounded-sm bg-transparent dark:bg-transparent"></div>
+                                }
+                                else
+                                {
+                                    <div class="aspect-square min-h-[2rem] rounded-sm border border-slate-200/40 dark:border-slate-600/40"
+                                         style="@HeatmapCellStyle(cell)"
+                                         title="@HeatmapTitle(cell)"></div>
+                                }
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+            <div class="mt-3 flex flex-wrap items-center gap-3 text-[10px] text-slate-500 dark:text-slate-400">
+                <span>Less</span>
+                <div class="flex gap-0.5">
+                    @foreach (var step in new[] { 0.0, 0.25, 0.5, 0.75, 1.0 })
+                    {
+                        <div class="h-3 w-5 rounded-sm border border-slate-300/30 dark:border-slate-600/30"
+                             style="@($"background-color: rgb(6 182 212 / {(0.12 + 0.78 * step).ToString("0.##", CultureInfo.InvariantCulture)});")"></div>
+                    }
+                </div>
+                <span>More</span>
+            </div>
+        </UICard>
+    }
+
     <UICard Title="Tracked animals" Class="mt-6">
         @if (dashboard.Territories.Count == 0)
         {
-            <p class="text-sm leading-relaxed text-slate-700 dark:text-slate-200">No geotagged linked-animal sightings yet. Add coordinates and link sightings to an animal profile to infer territory.</p>
+            <p class="text-sm leading-relaxed text-slate-600 dark:text-slate-400">No territory data yet. Add coordinates and link sightings to animal profiles.</p>
         }
         else
         {
-            <ul class="divide-y divide-slate-200/80 dark:divide-slate-800/80">
+            <div class="grid gap-4 sm:grid-cols-2">
                 @foreach (var territory in dashboard.Territories)
                 {
-                    <li class="py-3 text-sm">
-                        <div class="font-semibold text-slate-900 dark:text-slate-50">@territory.AnimalLabel · @territory.SpeciesName</div>
-                        <div class="mt-1 text-slate-600 dark:text-slate-300">
-                            @territory.CoordinateSightings sightings · core ~@FormatCoordinates(territory.CoreLatitude, territory.CoreLongitude) · radius ~@Math.Round(territory.RadiusMeters)m
+                    <div class="rounded-xl border border-slate-200/90 bg-gradient-to-br from-slate-50/80 to-white p-4 shadow-sm dark:border-slate-700/80 dark:from-slate-900/40 dark:to-slate-950/40">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="min-w-0">
+                                <p class="font-semibold text-slate-900 dark:text-slate-50">@territory.AnimalLabel</p>
+                                <p class="text-xs text-slate-600 dark:text-slate-400">@territory.SpeciesName</p>
+                            </div>
+                            <span class="shrink-0 rounded-full bg-sky-500/15 px-2 py-0.5 text-xs font-semibold text-sky-800 dark:bg-sky-500/20 dark:text-sky-200">@territory.CoordinateSightings</span>
                         </div>
-                        <div class="mt-1 text-slate-600 dark:text-slate-300">
-                            Best window: @territory.BestActivityWindowLocal · hunting sightings: @territory.HuntingSightings
+                        <div class="mt-3 flex flex-wrap gap-2">
+                            <span class="inline-flex items-center rounded-lg bg-slate-200/70 px-2 py-1 text-[11px] font-medium text-slate-800 dark:bg-slate-800/80 dark:text-slate-200">Core @FormatCoordinates(territory.CoreLatitude, territory.CoreLongitude)</span>
+                            <span class="inline-flex items-center rounded-lg bg-slate-200/70 px-2 py-1 text-[11px] font-medium text-slate-800 dark:bg-slate-800/80 dark:text-slate-200">~@Math.Round(territory.RadiusMeters)m</span>
+                            <span class="inline-flex items-center rounded-lg bg-slate-200/70 px-2 py-1 text-[11px] font-medium text-slate-800 dark:bg-slate-800/80 dark:text-slate-200">@territory.HuntingSightings hunting</span>
                         </div>
-                    </li>
+                        <p class="mt-2 text-xs text-slate-600 dark:text-slate-400">@territory.BestActivityWindowLocal</p>
+                    </div>
                 }
-            </ul>
+            </div>
         }
     </UICard>
 
     <UICard Title="Species hotspots" Class="mt-6">
         @if (dashboard.SpeciesHotspots.Count == 0)
         {
-            <p class="text-sm leading-relaxed text-slate-700 dark:text-slate-200">No geotagged sightings in this range.</p>
+            <p class="text-sm leading-relaxed text-slate-600 dark:text-slate-400">No geotagged sightings in this range.</p>
         }
         else
         {
-            <ul class="divide-y divide-slate-200/80 dark:divide-slate-800/80">
+            <div class="grid gap-4 sm:grid-cols-2">
                 @foreach (var hotspot in dashboard.SpeciesHotspots)
                 {
-                    <li class="py-3 text-sm">
-                        <div class="font-semibold text-slate-900 dark:text-slate-50">@hotspot.SpeciesName</div>
-                        <div class="mt-1 text-slate-600 dark:text-slate-300">
-                            @hotspot.CoordinateSightings geotagged sightings · hunting @hotspot.HuntingSightings
+                    <div class="rounded-xl border border-slate-200/90 bg-gradient-to-br from-emerald-50/50 to-white p-4 shadow-sm dark:border-slate-700/80 dark:from-emerald-950/20 dark:to-slate-950/40">
+                        <div class="flex items-start justify-between gap-2">
+                            <p class="font-semibold text-slate-900 dark:text-slate-50">@hotspot.SpeciesName</p>
+                            <span class="shrink-0 rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-semibold text-emerald-900 dark:bg-emerald-500/20 dark:text-emerald-200">@hotspot.CoordinateSightings</span>
                         </div>
-                        <div class="mt-1 text-slate-600 dark:text-slate-300">Hotspot core: @FormatCoordinates(hotspot.CoreLatitude, hotspot.CoreLongitude)</div>
-                    </li>
+                        <div class="mt-3 flex flex-wrap gap-2">
+                            <span class="inline-flex items-center rounded-lg bg-slate-200/70 px-2 py-1 text-[11px] font-medium text-slate-800 dark:bg-slate-800/80 dark:text-slate-200">Hunting @hotspot.HuntingSightings</span>
+                            <span class="inline-flex items-center rounded-lg bg-slate-200/70 px-2 py-1 text-[11px] font-medium text-slate-800 dark:bg-slate-800/80 dark:text-slate-200">@FormatCoordinates(hotspot.CoreLatitude, hotspot.CoreLongitude)</span>
+                        </div>
+                    </div>
                 }
-            </ul>
+            </div>
         }
     </UICard>
 }
 
 @code {
+    private readonly string _chartUid = Guid.NewGuid().ToString("n")[..8];
+    private string IdSpecies => $"stats-sp-{_chartUid}";
+    private string IdDaily => $"stats-daily-{_chartUid}";
+    private string IdBehavior => $"stats-beh-{_chartUid}";
+    private string IdCoverage => $"stats-cov-{_chartUid}";
+
     private bool loading = true;
+    private bool chartsDirty;
     private DateTime? fromLocalDate;
     private DateTime? toLocalDate;
     private TerritoryDashboardData dashboard = new([], []);
+    private SightingStatsSummary summary = new(0, 0, 0, 0, 0, 0, [], [], []);
+
+    private int MaxDailyCount => summary.DailyCounts.Count == 0 ? 0 : summary.DailyCounts.Max(x => x.Count);
+
+    private IReadOnlyList<IReadOnlyList<HeatmapCell>> HeatmapRows
+    {
+        get
+        {
+            if (summary.DailyCounts.Count == 0)
+                return [];
+
+            var byDay = summary.DailyCounts.ToDictionary(d => DateOnly.FromDateTime(d.DayUtc), d => d.Count);
+            var minD = byDay.Keys.Min();
+            var maxD = byDay.Keys.Max();
+            var cells = new List<HeatmapCell>();
+            var pad = MondayOffset(minD);
+            for (var i = 0; i < pad; i++)
+                cells.Add(new HeatmapCell(IsPadding: true, Day: null, Count: 0));
+
+            for (var d = minD; d <= maxD; d = d.AddDays(1))
+                cells.Add(new HeatmapCell(IsPadding: false, Day: d, Count: byDay.GetValueOrDefault(d, 0)));
+
+            var rows = new List<IReadOnlyList<HeatmapCell>>();
+            for (var i = 0; i < cells.Count; i += 7)
+                rows.Add(cells.Skip(i).Take(7).ToList());
+
+            var last = rows[^1].ToList();
+            while (last.Count < 7)
+                last.Add(new HeatmapCell(IsPadding: true, Day: null, Count: 0));
+            rows[^1] = last;
+
+            return rows;
+        }
+    }
+
+    private string GeotaggedSubtitle =>
+        summary.TotalSightings > 0
+            ? $"{PercentOf(summary.GeotaggedSightings, summary.TotalSightings)}% of sightings"
+            : "With coordinates";
 
     protected override async Task OnInitializedAsync() =>
         await ReloadAsync();
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (loading || !chartsDirty)
+            return;
+
+        try
+        {
+            await SyncChartsAsync();
+            chartsDirty = false;
+        }
+        catch (InvalidOperationException)
+        {
+            /* Interactive runtime not ready yet */
+        }
+        catch (JSException)
+        {
+            chartsDirty = false;
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await DestroyChartsAsync();
+    }
+
     private async Task ReloadAsync()
     {
+        await DestroyChartsAsync();
         loading = true;
+        chartsDirty = false;
+        await InvokeAsync(StateHasChanged);
 
         DateTime? fromUtc = fromLocalDate.HasValue
             ? DateTime.SpecifyKind(fromLocalDate.Value.Date, DateTimeKind.Local).ToUniversalTime()
@@ -100,14 +319,98 @@ else
             : null;
 
         dashboard = await Insights.GetDashboardAsync(fromUtc, toUtc);
+        summary = await Stats.GetSummaryAsync(fromUtc, toUtc);
         loading = false;
+        chartsDirty = true;
     }
+
+    private async Task DestroyChartsAsync()
+    {
+        try
+        {
+            foreach (var id in new[] { IdSpecies, IdDaily, IdBehavior, IdCoverage })
+                await JS.InvokeVoidAsync("animalTrackerStatsChartsDestroy", id);
+        }
+        catch
+        {
+            /* circuit gone or SSR */
+        }
+    }
+
+    private async Task SyncChartsAsync()
+    {
+        await DestroyChartsAsync();
+
+        if (summary.SpeciesCounts.Count > 0)
+        {
+            await JS.InvokeVoidAsync(
+                "animalTrackerStatsChartsDoughnut",
+                IdSpecies,
+                summary.SpeciesCounts.Select(s => s.SpeciesName).ToArray(),
+                summary.SpeciesCounts.Select(s => s.Count).ToArray());
+        }
+
+        if (summary.DailyCounts.Count > 0)
+        {
+            await JS.InvokeVoidAsync(
+                "animalTrackerStatsChartsBar",
+                IdDaily,
+                summary.DailyCounts.Select(d => d.DayUtc.ToString("MMM d", CultureInfo.InvariantCulture)).ToArray(),
+                summary.DailyCounts.Select(d => d.Count).ToArray(),
+                "Sightings");
+        }
+
+        if (summary.BehaviorCounts.Count > 0)
+        {
+            await JS.InvokeVoidAsync(
+                "animalTrackerStatsChartsHorizontalBar",
+                IdBehavior,
+                summary.BehaviorCounts.Select(b => b.Behavior.ToString()).ToArray(),
+                summary.BehaviorCounts.Select(b => b.Count).ToArray());
+        }
+
+        if (summary.TotalSightings > 0)
+        {
+            var gt = summary.GeotaggedSightings;
+            var ng = Math.Max(0, summary.TotalSightings - gt);
+            await JS.InvokeVoidAsync(
+                "animalTrackerStatsChartsDoughnut",
+                IdCoverage,
+                new[] { "Geotagged", "Not geotagged" },
+                new[] { gt, ng });
+        }
+    }
+
+    private static int PercentOf(int part, int whole) =>
+        whole <= 0 ? 0 : (int)Math.Round(100.0 * part / whole);
+
+    private static int MondayOffset(DateOnly d)
+    {
+        var dow = (int)d.DayOfWeek;
+        return dow == 0 ? 6 : dow - 1;
+    }
+
+    private string HeatmapCellStyle(HeatmapCell cell)
+    {
+        var max = MaxDailyCount;
+        if (max <= 0)
+            return "background-color: rgb(51 65 85 / 0.15);";
+
+        var t = cell.Count <= 0 ? 0 : Math.Pow(Math.Clamp(cell.Count / (double)max, 0, 1), 0.55);
+        var a = 0.12 + 0.78 * t;
+        return $"background-color: rgb(6 182 212 / {a.ToString("0.##", CultureInfo.InvariantCulture)});";
+    }
+
+    private static string HeatmapTitle(HeatmapCell cell) =>
+        cell.Day is { } d ? $"{d:yyyy-MM-dd}: {cell.Count} sighting(s)" : "";
 
     private static string FormatCoordinates(double? lat, double? lng)
     {
         if (lat is null || lng is null)
-            return "unknown";
+            return "—";
 
-        return $"{lat.Value:0.00000}, {lng.Value:0.00000}";
+        return $"{lat.Value:0.000}, {lng.Value:0.000}";
     }
+
+    private sealed record HeatmapCell(bool IsPadding, DateOnly? Day, int Count);
 }

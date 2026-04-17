@@ -60,6 +60,47 @@ public sealed class PhotoStorageService(IWebHostEnvironment env, CurrentUserServ
             Sha256Hex: stored.Sha256Hex);
     }
 
+    /// <summary>
+    /// Saves an image from a stream (e.g. bulk import). Same optimization and metadata stripping as browser uploads.
+    /// </summary>
+    public async Task<StoredPhoto> SaveSightingPhotoFromStreamAsync(
+        Stream stream,
+        string originalFileName,
+        string contentType,
+        long maxBytes = DefaultMaxUploadBytes,
+        CancellationToken cancellationToken = default)
+    {
+        if (GuessExtension(contentType) is null)
+            throw new ArgumentException("Unsupported image type. Use JPEG, PNG, GIF, or WebP.", nameof(contentType));
+
+        var userId = await currentUser.GetRequiredUserIdAsync(cancellationToken);
+        var photosRoot = Path.Combine(env.ContentRootPath, "App_Data", "photos");
+
+        var now = DateTimeOffset.UtcNow;
+        var dir = Path.Combine(photosRoot, userId, now.Year.ToString("0000"), now.Month.ToString("00"));
+        Directory.CreateDirectory(dir);
+
+        var fileName = $"{Guid.NewGuid():N}.jpg";
+        var absPath = Path.Combine(dir, fileName);
+
+        var originalName = Path.GetFileName(originalFileName);
+        var stored = await SaveOptimizedJpegFromStreamAsync(
+            stream,
+            absPath,
+            maxAllowedBytes: maxBytes,
+            maxDimensionPx: DefaultSightingMaxDimensionPx,
+            jpegQuality: DefaultJpegQuality,
+            cancellationToken: cancellationToken);
+
+        var relative = Path.GetRelativePath(env.ContentRootPath, absPath).Replace('\\', '/');
+        return new StoredPhoto(
+            StoredRelativePath: relative,
+            OriginalFileName: originalName,
+            ContentType: "image/jpeg",
+            SizeBytes: stored.SizeBytes,
+            Sha256Hex: stored.Sha256Hex);
+    }
+
     public FileStream OpenRead(string storedRelativePath)
     {
         var abs = Path.GetFullPath(Path.Combine(env.ContentRootPath, storedRelativePath));
@@ -220,24 +261,49 @@ public sealed class PhotoStorageService(IWebHostEnvironment env, CurrentUserServ
             throw new ArgumentException("Unsupported image type. Use JPEG, PNG, GIF, or WebP.", nameof(file));
 
         await using var input = file.OpenReadStream(maxAllowedSize: maxAllowedBytes, cancellationToken: cancellationToken);
+        return await SaveOptimizedJpegFromStreamCoreAsync(input, absPath, maxAllowedBytes, maxDimensionPx, jpegQuality, nameof(file), cancellationToken);
+    }
 
+    private static async Task<StoredFileResult> SaveOptimizedJpegFromStreamAsync(
+        Stream stream,
+        string absPath,
+        long maxAllowedBytes,
+        int maxDimensionPx,
+        int jpegQuality,
+        CancellationToken cancellationToken)
+    {
+        return await SaveOptimizedJpegFromStreamCoreAsync(stream, absPath, maxAllowedBytes, maxDimensionPx, jpegQuality, "stream", cancellationToken);
+    }
+
+    private static async Task<StoredFileResult> SaveOptimizedJpegFromStreamCoreAsync(
+        Stream input,
+        string absPath,
+        long maxAllowedBytes,
+        int maxDimensionPx,
+        int jpegQuality,
+        string errorParamName,
+        CancellationToken cancellationToken)
+    {
+        await using var buffer = await ReadAllLimitedAsync(input, maxAllowedBytes, errorParamName, cancellationToken);
+        var bytes = buffer.ToArray();
+        var sourceHash = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+
+        await using var decodeStream = new MemoryStream(bytes, writable: false);
         Image image;
         try
         {
-            image = await Image.LoadAsync(input, cancellationToken);
+            image = await Image.LoadAsync(decodeStream, cancellationToken);
         }
         catch (Exception ex)
         {
-            throw new ArgumentException($"Could not read image: {ex.Message}", nameof(file));
+            throw new ArgumentException($"Could not read image: {ex.Message}", errorParamName);
         }
 
-        using var _ = image; // ensure dispose even if encode fails
+        using var _ = image;
 
-        // If animated (GIF/WebP), keep only the first frame for now.
         while (image.Frames.Count > 1)
             image.Frames.RemoveFrame(1);
 
-        // Strip metadata (privacy + smaller files).
         image.Metadata.ExifProfile = null;
         image.Metadata.IptcProfile = null;
         image.Metadata.XmpProfile = null;
@@ -256,21 +322,40 @@ public sealed class PhotoStorageService(IWebHostEnvironment env, CurrentUserServ
         Directory.CreateDirectory(Path.GetDirectoryName(absPath)!);
 
         await using var output = new FileStream(absPath, FileMode.CreateNew, FileAccess.Write, FileShare.Read, 64 * 1024, useAsync: true);
-        using var sha = SHA256.Create();
-        await using var crypto = new CryptoStream(output, sha, CryptoStreamMode.Write, leaveOpen: true);
 
         var encoder = new JpegEncoder
         {
             Quality = Math.Clamp(jpegQuality, 40, 95),
         };
 
-        await image.SaveAsJpegAsync(crypto, encoder, cancellationToken);
-        await crypto.FlushAsync(cancellationToken);
-        crypto.FlushFinalBlock();
+        await image.SaveAsJpegAsync(output, encoder, cancellationToken);
+        await output.FlushAsync(cancellationToken);
 
         var size = output.Length;
-        var hashHex = Convert.ToHexString(sha.Hash!).ToLowerInvariant();
-        return new StoredFileResult(SizeBytes: size, Sha256Hex: hashHex);
+        return new StoredFileResult(SizeBytes: size, Sha256Hex: sourceHash);
+    }
+
+    private static async Task<MemoryStream> ReadAllLimitedAsync(
+        Stream input,
+        long maxAllowedBytes,
+        string errorParamName,
+        CancellationToken cancellationToken)
+    {
+        var ms = new MemoryStream();
+        var buffer = new byte[81920];
+        long total = 0;
+        int read;
+        while ((read = await input.ReadAsync(buffer, cancellationToken)) > 0)
+        {
+            total += read;
+            if (total > maxAllowedBytes)
+                throw new ArgumentException($"File too large (max {(maxAllowedBytes / BytesPerMb)} MB).", errorParamName);
+
+            await ms.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+        }
+
+        ms.Position = 0;
+        return ms;
     }
 }
 

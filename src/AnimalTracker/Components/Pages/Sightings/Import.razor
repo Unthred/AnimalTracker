@@ -1,0 +1,196 @@
+@page "/sightings/import"
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+
+@using AnimalTracker.Services
+@using AnimalTracker.Components.UI
+@using AnimalTracker.Data.Entities
+@inject PhotoImportService Importer
+@inject SpeciesService Species
+@inject LocationService Locations
+@inject AppSettingsService AppSettings
+@inject NavigationManager Nav
+
+<PageTitle>Import photos</PageTitle>
+
+<UIPageHeader Title="Import photos" Description="Upload a folder or multiple images. Bursts are merged into one sighting when time and GPS match your settings." />
+
+<div class="mb-4">
+    <span class="inline-flex items-center rounded-full border border-slate-200/90 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+        Species region: @(string.IsNullOrWhiteSpace(activeSpeciesRegionName) ? "Not selected" : activeSpeciesRegionName)
+    </span>
+</div>
+
+<UICard>
+    <EditForm Model="model" OnValidSubmit="SubmitAsync" class="space-y-6">
+        <UIField Label="Photos" For="files" Hint="Select many images. EXIF date and GPS are read before compression. Configure Recognition:BaseUrl for automatic species hints.">
+            <InputFile OnChange="OnFiles" multiple accept="image/*"
+                       class="block w-full cursor-pointer rounded-xl border border-dashed border-slate-200/90 bg-slate-50/50 px-4 py-6 text-sm text-slate-600 transition duration-200 file:mr-4 file:cursor-pointer file:rounded-lg file:border-0 file:bg-[var(--accent)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-950/50 dark:text-slate-300 dark:hover:border-slate-600" />
+            @if (selectedFiles.Count > 0)
+            {
+                <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">@selectedFiles.Count file(s) selected</p>
+            }
+        </UIField>
+
+        <div class="grid min-w-0 grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8">
+            <UIField Label="Fallback species" For="fallback" Hint="Used when recognition is off or confidence is low.">
+                <select id="fallback" class="w-full min-w-0 px-3 py-2.5" value="@(model.FallbackSpeciesId?.ToString() ?? "")" @onchange="OnFallbackSpeciesChange">
+                    <option value="">None (strict — requires recognition match)</option>
+                    @foreach (var s in species)
+                    {
+                        <option value="@s.Id">@s.Name</option>
+                    }
+                </select>
+            </UIField>
+
+            <UIField Label="Location" For="location">
+                <InputText id="location"
+                           list="location-options"
+                           class="w-full min-w-0 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
+                           placeholder="Default or existing location name"
+                           autocomplete="off"
+                           @bind-Value="model.LocationName" />
+                <datalist id="location-options">
+                    @foreach (var l in locations)
+                    {
+                        <option value="@l.Name"></option>
+                    }
+                </datalist>
+            </UIField>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(errorMessage))
+        {
+            <p class="text-sm text-red-700 dark:text-red-300">@errorMessage</p>
+        }
+
+        @if (result is not null)
+        {
+            <div class="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 text-sm dark:border-slate-700 dark:bg-slate-950/50">
+                <p class="font-semibold text-slate-900 dark:text-slate-50">Import complete</p>
+                <ul class="mt-2 list-inside list-disc text-slate-700 dark:text-slate-200">
+                    <li>Sightings created: @result.CreatedSightings</li>
+                    <li>Photos attached: @result.PhotosAttached</li>
+                    <li>Skipped duplicates: @result.SkippedDuplicates</li>
+                    <li>Needs review: @result.NeedsReviewItems</li>
+                    <li>Failed: @result.FailedItems</li>
+                </ul>
+                @if (result.Errors.Count > 0)
+                {
+                    <p class="mt-2 font-medium text-slate-800 dark:text-slate-100">Messages</p>
+                    <ul class="mt-1 list-inside list-disc text-slate-600 dark:text-slate-300">
+                        @foreach (var err in result.Errors.Take(20))
+                        {
+                            <li>@err</li>
+                        }
+                    </ul>
+                }
+            </div>
+        }
+
+        <div class="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:flex-wrap sm:justify-end sm:gap-3">
+            <UIButton Href="/" Variant="UiButtonVariant.Outline" Class="w-full sm:w-auto">Cancel</UIButton>
+            <UIButton Type="submit" Variant="UiButtonVariant.Primary" Class="w-full sm:w-auto" Disabled="@busy">Import</UIButton>
+        </div>
+    </EditForm>
+</UICard>
+
+@code {
+    private readonly List<IBrowserFile> selectedFiles = [];
+    private List<Species> species = [];
+    private List<Location> locations = [];
+    private readonly ImportModel model = new();
+    private bool busy;
+    private string? errorMessage;
+    private PhotoImportBatchResult? result;
+    private string? activeSpeciesRegionName;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var appSettings = await AppSettings.GetOrCreateAsync();
+        activeSpeciesRegionName = appSettings.ActiveSpeciesRegionName;
+        species = await Species.GetAllAsync();
+        locations = await Locations.GetAllAsync();
+        if (locations.Count == 0)
+        {
+            await Locations.GetOrCreateDefaultAsync();
+            locations = await Locations.GetAllAsync();
+        }
+    }
+
+    private void OnFiles(InputFileChangeEventArgs e)
+    {
+        selectedFiles.Clear();
+        selectedFiles.AddRange(e.GetMultipleFiles());
+        result = null;
+        errorMessage = null;
+    }
+
+    private void OnFallbackSpeciesChange(ChangeEventArgs e)
+    {
+        var v = e.Value?.ToString();
+        if (string.IsNullOrWhiteSpace(v))
+        {
+            model.FallbackSpeciesId = null;
+            return;
+        }
+
+        model.FallbackSpeciesId = int.TryParse(v, out var id) ? id : null;
+    }
+
+    private async Task SubmitAsync()
+    {
+        errorMessage = null;
+        result = null;
+        if (selectedFiles.Count == 0)
+        {
+            errorMessage = "Select at least one image.";
+            return;
+        }
+
+        busy = true;
+        try
+        {
+            var locationId = await ResolveLocationIdAsync();
+            var fallback = model.FallbackSpeciesId;
+            result = await Importer.RunAsync(selectedFiles, fallback, locationId);
+            if (result is { CreatedSightings: 1, FirstCreatedSightingId: { } onlyId } &&
+                result.FailedItems == 0 &&
+                result.SkippedDuplicates == 0)
+                Nav.NavigateTo($"/sightings/{onlyId}");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private async Task<int?> ResolveLocationIdAsync()
+    {
+        var locationName = (model.LocationName ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(locationName))
+            return null;
+
+        var existingLocation = locations.FirstOrDefault(x => string.Equals(x.Name, locationName, StringComparison.OrdinalIgnoreCase));
+        if (existingLocation is not null)
+            return existingLocation.Id;
+
+        var createdLocation = await Locations.CreateAsync(locationName, notes: null);
+        locations = locations.Append(createdLocation).OrderBy(x => x.Name).ToList();
+        return createdLocation.Id;
+    }
+
+    private sealed class ImportModel
+    {
+        public int? FallbackSpeciesId { get; set; }
+
+        [System.ComponentModel.DataAnnotations.StringLength(200)]
+        public string? LocationName { get; set; }
+    }
+}

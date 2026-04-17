@@ -677,7 +677,8 @@ else
                     OriginalFileName = stored.OriginalFileName,
                     ContentType = stored.ContentType,
                     SizeBytes = stored.SizeBytes,
-                    CreatedAtUtc = DateTime.UtcNow
+                    CreatedAtUtc = DateTime.UtcNow,
+                    ContentSha256Hex = stored.Sha256Hex
                 });
             }
 

@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Localization;
+using Microsoft.Extensions.Options;
 using System.Globalization;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -76,6 +77,18 @@ builder.Services.AddHttpClient(nameof(SpeciesCatalogSyncService), client =>
     client.BaseAddress = new Uri("https://api.inaturalist.org/");
     client.Timeout = TimeSpan.FromSeconds(15);
 });
+builder.Services.Configure<RecognitionOptions>(builder.Configuration.GetSection(RecognitionOptions.SectionName));
+builder.Services.Configure<PhotoImportOptions>(builder.Configuration.GetSection(PhotoImportOptions.SectionName));
+builder.Services.AddScoped<ExifMetadataService>();
+builder.Services.AddScoped<PhotoImportService>();
+builder.Services.AddHttpClient(nameof(LocalAnimalRecognitionClient), (sp, client) =>
+{
+    var options = sp.GetRequiredService<IOptions<RecognitionOptions>>().Value;
+    if (!string.IsNullOrWhiteSpace(options.BaseUrl))
+        client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/");
+    client.Timeout = TimeSpan.FromSeconds(Math.Clamp(options.TimeoutSeconds, 5, 120));
+});
+builder.Services.AddScoped<IAnimalRecognitionService, LocalAnimalRecognitionClient>();
 builder.Services.AddScoped<CurrentUserService>();
 builder.Services.AddScoped<LoginAuditService>();
 builder.Services.AddScoped<LocationService>();
@@ -85,6 +98,7 @@ builder.Services.AddScoped<SpeciesCatalogSyncService>();
 builder.Services.AddScoped<AnimalService>();
 builder.Services.AddScoped<SightingService>();
 builder.Services.AddScoped<TerritoryInsightsService>();
+builder.Services.AddScoped<StatsService>();
 builder.Services.AddScoped<PhotoStorageService>();
 builder.Services.AddScoped<TimelineFilterState>();
 builder.Services.AddScoped<UserSettingsService>();

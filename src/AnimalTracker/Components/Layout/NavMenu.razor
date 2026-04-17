@@ -22,6 +22,11 @@
         </NavLink>
 
         <NavLink class="app-nav-link"
+                 href="sightings/import">
+            Import photos
+        </NavLink>
+
+        <NavLink class="app-nav-link"
                  href="animals">
             Animals
         </NavLink>
@@ -141,9 +146,12 @@
         });
     }
 
+    // Keep the email submenu open on account pages and admin (same UX as Manage/* links).
     private bool IsOnAccountPage =>
         !string.IsNullOrWhiteSpace(currentUrl) &&
-        currentUrl.StartsWith("Account/Manage", StringComparison.OrdinalIgnoreCase);
+        (currentUrl.StartsWith("Account/Manage", StringComparison.OrdinalIgnoreCase)
+         || currentUrl.Equals("admin", StringComparison.OrdinalIgnoreCase)
+         || currentUrl.StartsWith("admin/", StringComparison.OrdinalIgnoreCase));
 
     private bool ShowAccountMenu => accountMenuExpanded || IsOnAccountPage;
 
