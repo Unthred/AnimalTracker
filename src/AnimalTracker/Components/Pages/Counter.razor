@@ -5,12 +5,109 @@
 @attribute [Authorize]
 
 @using AnimalTracker.Services
-@inject SightingService Sightings
+@inject TerritoryInsightsService Insights
 
 <PageTitle>Stats</PageTitle>
 
-<UIPageHeader Title="Stats" Description="Summary metrics for your sightings (MVP placeholder)." />
+<UIPageHeader Title="Territory insights" Description="Core areas, activity windows, and hunting zones inferred from your sightings.">
+    <Actions>
+        <UIButton Href="/map" Variant="UiButtonVariant.Outline">Open map</UIButton>
+    </Actions>
+</UIPageHeader>
 
-<UICard>
-    <p class="text-sm leading-relaxed text-slate-700 dark:text-slate-200">Coming next: counts per species and top animals.</p>
+<UICard Class="mt-2">
+    <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+        <UIField Label="From date" For="fromDate">
+            <InputDate id="fromDate" class="w-full min-w-0 px-3 py-2.5" @bind-Value="fromLocalDate" @bind-Value:after="ReloadAsync" />
+        </UIField>
+        <UIField Label="To date" For="toDate">
+            <InputDate id="toDate" class="w-full min-w-0 px-3 py-2.5" @bind-Value="toLocalDate" @bind-Value:after="ReloadAsync" />
+        </UIField>
+    </div>
 </UICard>
+
+@if (loading)
+{
+    <p class="mt-6 text-sm text-slate-600 dark:text-slate-400">Loading…</p>
+}
+else
+{
+    <UICard Title="Tracked animals" Class="mt-6">
+        @if (dashboard.Territories.Count == 0)
+        {
+            <p class="text-sm leading-relaxed text-slate-700 dark:text-slate-200">No geotagged linked-animal sightings yet. Add coordinates and link sightings to an animal profile to infer territory.</p>
+        }
+        else
+        {
+            <ul class="divide-y divide-slate-200/80 dark:divide-slate-800/80">
+                @foreach (var territory in dashboard.Territories)
+                {
+                    <li class="py-3 text-sm">
+                        <div class="font-semibold text-slate-900 dark:text-slate-50">@territory.AnimalLabel · @territory.SpeciesName</div>
+                        <div class="mt-1 text-slate-600 dark:text-slate-300">
+                            @territory.CoordinateSightings sightings · core ~@FormatCoordinates(territory.CoreLatitude, territory.CoreLongitude) · radius ~@Math.Round(territory.RadiusMeters)m
+                        </div>
+                        <div class="mt-1 text-slate-600 dark:text-slate-300">
+                            Best window: @territory.BestActivityWindowLocal · hunting sightings: @territory.HuntingSightings
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+    </UICard>
+
+    <UICard Title="Species hotspots" Class="mt-6">
+        @if (dashboard.SpeciesHotspots.Count == 0)
+        {
+            <p class="text-sm leading-relaxed text-slate-700 dark:text-slate-200">No geotagged sightings in this range.</p>
+        }
+        else
+        {
+            <ul class="divide-y divide-slate-200/80 dark:divide-slate-800/80">
+                @foreach (var hotspot in dashboard.SpeciesHotspots)
+                {
+                    <li class="py-3 text-sm">
+                        <div class="font-semibold text-slate-900 dark:text-slate-50">@hotspot.SpeciesName</div>
+                        <div class="mt-1 text-slate-600 dark:text-slate-300">
+                            @hotspot.CoordinateSightings geotagged sightings · hunting @hotspot.HuntingSightings
+                        </div>
+                        <div class="mt-1 text-slate-600 dark:text-slate-300">Hotspot core: @FormatCoordinates(hotspot.CoreLatitude, hotspot.CoreLongitude)</div>
+                    </li>
+                }
+            </ul>
+        }
+    </UICard>
+}
+
+@code {
+    private bool loading = true;
+    private DateTime? fromLocalDate;
+    private DateTime? toLocalDate;
+    private TerritoryDashboardData dashboard = new([], []);
+
+    protected override async Task OnInitializedAsync() =>
+        await ReloadAsync();
+
+    private async Task ReloadAsync()
+    {
+        loading = true;
+
+        DateTime? fromUtc = fromLocalDate.HasValue
+            ? DateTime.SpecifyKind(fromLocalDate.Value.Date, DateTimeKind.Local).ToUniversalTime()
+            : null;
+        DateTime? toUtc = toLocalDate.HasValue
+            ? DateTime.SpecifyKind(toLocalDate.Value.Date.AddDays(1).AddTicks(-1), DateTimeKind.Local).ToUniversalTime()
+            : null;
+
+        dashboard = await Insights.GetDashboardAsync(fromUtc, toUtc);
+        loading = false;
+    }
+
+    private static string FormatCoordinates(double? lat, double? lng)
+    {
+        if (lat is null || lng is null)
+            return "unknown";
+
+        return $"{lat.Value:0.00000}, {lng.Value:0.00000}";
+    }
+}

@@ -9,14 +9,18 @@
 @using AnimalTracker.Services
 @using AnimalTracker.Data.Entities
 @using AnimalTracker.Data
+@using SixLabors.ImageSharp
+@using SixLabors.ImageSharp.Metadata.Profiles.Exif
 @inject SightingService Sightings
 @inject SpeciesService Species
+@inject AppSettingsService AppSettings
 @inject LocationService Locations
 @inject AnimalService Animals
 @inject NavigationManager Nav
 @inject ApplicationDbContext Db
 @inject PhotoStorageService Storage
 @inject AnimalTracker.State.UserPreferencesState Prefs
+@inject IJSRuntime JS
 
 <PageTitle>Edit sighting</PageTitle>
 
@@ -89,6 +93,12 @@ else
 {
     <UIPageHeader Title="Edit sighting" Description="Fix time, species, location, notes, or link an animal." />
 
+    <div class="mb-4">
+        <span class="inline-flex items-center rounded-full border border-slate-200/90 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+            Species region: @(string.IsNullOrWhiteSpace(activeSpeciesRegionName) ? "Not selected" : activeSpeciesRegionName)
+        </span>
+    </div>
+
     @if (!string.IsNullOrWhiteSpace(error))
     {
         <UIAlert Variant="UiAlertVariant.Danger" Class="mb-8">@error</UIAlert>
@@ -133,27 +143,23 @@ else
 
             <div class="grid min-w-0 grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8">
                 <UIField Label="Species" For="species">
-                    <InputText id="species"
-                               list="species-options"
-                               class="w-full min-w-0 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80"
-                               placeholder="Select or type a new species"
-                               autocomplete="off"
-                               @bind-Value="model.SpeciesName" />
-                    <datalist id="species-options">
+                    <select id="species" class="w-full min-w-0 px-3 py-2.5" @bind="model.SpeciesId">
+                        <option value="">Select…</option>
                         @foreach (var s in species)
                         {
-                            <option value="@s.Name"></option>
+                            <option value="@s.Id">@s.Name</option>
                         }
-                    </datalist>
-                    <div class="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <p class="text-xs text-slate-500 dark:text-slate-400">Type a name and click Add to create it now.</p>
-                        <UIButton Type="button" Variant="UiButtonVariant.Outline" Size="UiButtonSize.Sm" @onclick="AddSpeciesAsync">Add species</UIButton>
-                    </div>
-                    @if (!string.IsNullOrWhiteSpace(speciesInlineError))
+                    </select>
+                    @if (species.Count == 0)
                     {
-                        <p class="mt-2 text-sm text-red-700 dark:text-red-300">@speciesInlineError</p>
+                        <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">Select a species region in Settings to load this list.</p>
                     }
-                    <ValidationMessage For="() => model.SpeciesName" />
+                    <div class="mt-2">
+                        <UIButton Href="/species" target="_blank" rel="noreferrer noopener" Variant="UiButtonVariant.Outline" Size="UiButtonSize.Sm">
+                            Lookup species
+                        </UIButton>
+                    </div>
+                    <ValidationMessage For="() => model.SpeciesId" />
                 </UIField>
 
                 <UIField Label="Location" For="location">
@@ -189,6 +195,75 @@ else
                     }
                 </select>
             </UIField>
+
+            <div class="grid min-w-0 grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8">
+                <UIField Label="Behavior" For="behavior">
+                    <select id="behavior" class="w-full min-w-0 px-3 py-2.5" @bind="model.Behavior">
+                        <option value="">Not specified</option>
+                        @foreach (var behavior in Enum.GetValues<SightingBehavior>())
+                        {
+                            <option value="@behavior">@behavior</option>
+                        }
+                    </select>
+                </UIField>
+                <UIField Label="Observed until" For="observedUntil">
+                    <InputDate id="observedUntil" TValue="DateTime?" Type="InputDateType.DateTimeLocal" class="w-full min-w-0 px-3 py-2.5" @bind-Value="model.ObservedUntilLocal" />
+                </UIField>
+            </div>
+
+            <div class="grid min-w-0 grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8">
+                <UIField Label="Species confidence" For="speciesConfidence">
+                    <select id="speciesConfidence" class="w-full min-w-0 px-3 py-2.5" @bind="model.SpeciesConfidence">
+                        <option value="">Not specified</option>
+                        @foreach (var confidence in Enum.GetValues<SightingConfidence>())
+                        {
+                            <option value="@confidence">@confidence</option>
+                        }
+                    </select>
+                </UIField>
+                <UIField Label="Individual confidence" For="individualConfidence">
+                    <select id="individualConfidence" class="w-full min-w-0 px-3 py-2.5" @bind="model.IndividualConfidence">
+                        <option value="">Not specified</option>
+                        @foreach (var confidence in Enum.GetValues<SightingConfidence>())
+                        {
+                            <option value="@confidence">@confidence</option>
+                        }
+                    </select>
+                </UIField>
+            </div>
+
+            <div class="grid min-w-0 grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8">
+                <UIField Label="Latitude" For="latitude">
+                    <InputNumber id="latitude"
+                                 class="w-full min-w-0 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80"
+                                 @bind-Value="model.Latitude" />
+                    <ValidationMessage For="() => model.Latitude" />
+                </UIField>
+                <UIField Label="Longitude" For="longitude">
+                    <InputNumber id="longitude"
+                                 class="w-full min-w-0 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80"
+                                 @bind-Value="model.Longitude" />
+                    <ValidationMessage For="() => model.Longitude" />
+                </UIField>
+            </div>
+            <div class="grid min-w-0 grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8">
+                <UIField Label="GPS accuracy (m)" For="gpsAccuracy">
+                    <InputNumber id="gpsAccuracy"
+                                 class="w-full min-w-0 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80"
+                                 @bind-Value="model.LocationAccuracyMeters" />
+                    <ValidationMessage For="() => model.LocationAccuracyMeters" />
+                </UIField>
+            </div>
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <p class="text-xs text-slate-500 dark:text-slate-400">
+                    Coordinates auto-fill from photo EXIF first, then device GPS if needed.
+                </p>
+                <UIButton Type="button" Variant="UiButtonVariant.Outline" Size="UiButtonSize.Sm" @onclick="UseCurrentDeviceLocationAsync">Use device location</UIButton>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(coordinateMessage))
+            {
+                <p class="text-sm text-slate-600 dark:text-slate-300">@coordinateMessage</p>
+            }
 
             <UIField Label="Notes" For="notes">
                 <InputTextArea id="notes" class="w-full min-w-0 px-3 py-2.5" @bind-Value="model.Notes" rows="4" />
@@ -274,14 +349,16 @@ else
     private string? error;
     private string? uploadError;
     private string? deletePhotoError;
-    private string? speciesInlineError;
     private string? locationInlineError;
+    private string? coordinateMessage;
     private int? confirmDeletePhotoId;
     private IDisposable? backgroundScope;
+    private string? activeSpeciesRegionName;
 
     private readonly Model model = new();
     private int hourPart;
     private int minutePart;
+    private const long MaxPhotoUploadBytes = 25L * 1024L * 1024L;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -289,8 +366,11 @@ else
         error = null;
         uploadError = null;
         deletePhotoError = null;
+        coordinateMessage = null;
         confirmDeletePhotoId = null;
 
+        var appSettings = await AppSettings.GetOrCreateAsync();
+        activeSpeciesRegionName = appSettings.ActiveSpeciesRegionName;
         species = await Species.GetAllAsync();
         locations = await Locations.GetAllAsync();
         if (locations.Count == 0)
@@ -303,10 +383,17 @@ else
         sighting = await Sightings.GetAsync(Id);
         if (sighting is not null)
         {
-            model.SpeciesName = species.FirstOrDefault(x => x.Id == sighting.SpeciesId)?.Name ?? sighting.Species.Name;
+            model.SpeciesId = sighting.SpeciesId;
             model.LocationName = sighting.Location?.Name;
             model.AnimalId = sighting.AnimalId;
             model.Notes = sighting.Notes;
+            model.Behavior = sighting.Behavior;
+            model.SpeciesConfidence = sighting.SpeciesConfidence;
+            model.IndividualConfidence = sighting.IndividualConfidence;
+            model.Latitude = sighting.Latitude;
+            model.Longitude = sighting.Longitude;
+            model.LocationAccuracyMeters = sighting.LocationAccuracyMeters;
+            model.ObservedUntilLocal = sighting.ObservedUntilUtc?.ToLocalTime();
 
             var local = sighting.OccurredAtUtc.ToLocalTime();
             model.OccurredAtLocalDate = local.Date;
@@ -345,55 +432,31 @@ else
     private async Task SaveAsync()
     {
         error = null;
-        speciesInlineError = null;
         locationInlineError = null;
         try
         {
-            var speciesId = await ResolveSpeciesIdAsync();
             var locationId = await ResolveLocationIdAsync();
             var occurredAtUtc = model.GetOccurredAtUtc();
             var updated = await Sightings.UpdateAsync(
                 id: Id,
                 occurredAtUtc: occurredAtUtc,
-                speciesId: speciesId,
+                speciesId: model.SpeciesId!.Value,
                 locationId: locationId,
                 animalId: model.AnimalId,
-                notes: model.Notes);
+                notes: model.Notes,
+                observedUntilUtc: model.GetObservedUntilUtc(),
+                latitude: model.Latitude,
+                longitude: model.Longitude,
+                locationAccuracyMeters: model.LocationAccuracyMeters,
+                behavior: model.Behavior,
+                speciesConfidence: model.SpeciesConfidence,
+                individualConfidence: model.IndividualConfidence);
 
             Nav.NavigateTo($"/sightings/{updated.Id}");
         }
         catch (Exception ex)
         {
             error = ex.Message;
-        }
-    }
-
-    private async Task AddSpeciesAsync()
-    {
-        speciesInlineError = null;
-        var speciesName = (model.SpeciesName ?? "").Trim();
-        if (string.IsNullOrWhiteSpace(speciesName))
-        {
-            speciesInlineError = "Enter a species name first.";
-            return;
-        }
-
-        var existingSpecies = species.FirstOrDefault(x => string.Equals(x.Name, speciesName, StringComparison.OrdinalIgnoreCase));
-        if (existingSpecies is not null)
-        {
-            model.SpeciesName = existingSpecies.Name;
-            return;
-        }
-
-        try
-        {
-            var createdSpecies = await Species.CreateAsync(speciesName, description: null);
-            species = species.Append(createdSpecies).OrderBy(x => x.Name).ToList();
-            model.SpeciesName = createdSpecies.Name;
-        }
-        catch (Exception ex)
-        {
-            speciesInlineError = ex.Message;
         }
     }
 
@@ -426,18 +489,6 @@ else
         }
     }
 
-    private async Task<int> ResolveSpeciesIdAsync()
-    {
-        var speciesName = (model.SpeciesName ?? "").Trim();
-        var existingSpecies = species.FirstOrDefault(x => string.Equals(x.Name, speciesName, StringComparison.OrdinalIgnoreCase));
-        if (existingSpecies is not null)
-            return existingSpecies.Id;
-
-        var createdSpecies = await Species.CreateAsync(speciesName, description: null);
-        species = species.Append(createdSpecies).OrderBy(x => x.Name).ToList();
-        return createdSpecies.Id;
-    }
-
     private async Task<int?> ResolveLocationIdAsync()
     {
         var locationName = (model.LocationName ?? "").Trim();
@@ -453,6 +504,157 @@ else
         return createdLocation.Id;
     }
 
+    private async Task UseCurrentDeviceLocationAsync() =>
+        await TryApplyDeviceCoordinatesAsync("Coordinates updated from device location.");
+
+    private async Task TryAutoFillCoordinatesAsync(List<IBrowserFile> files)
+    {
+        coordinateMessage = null;
+        if (model.Latitude is not null && model.Longitude is not null)
+        {
+            coordinateMessage = "Keeping existing coordinates.";
+            return;
+        }
+
+        if (await TryApplyCoordinatesFromPhotoExifAsync(files))
+            return;
+
+        await TryApplyDeviceCoordinatesAsync("Photo had no GPS metadata. Used device location.");
+    }
+
+    private async Task<bool> TryApplyCoordinatesFromPhotoExifAsync(List<IBrowserFile> files)
+    {
+        foreach (var photo in files)
+        {
+            try
+            {
+                await using var stream = photo.OpenReadStream(MaxPhotoUploadBytes);
+                var imageInfo = await Image.IdentifyAsync(stream);
+                var exif = imageInfo?.Metadata?.ExifProfile;
+                if (exif is null)
+                    continue;
+
+                if (!exif.TryGetValue(ExifTag.GPSLatitudeRef, out IExifValue<string>? latRefValue))
+                    continue;
+                if (!exif.TryGetValue(ExifTag.GPSLongitudeRef, out IExifValue<string>? lonRefValue))
+                    continue;
+                if (!exif.TryGetValue(ExifTag.GPSLatitude, out IExifValue<Rational[]>? latValue))
+                    continue;
+                if (!exif.TryGetValue(ExifTag.GPSLongitude, out IExifValue<Rational[]>? lonValue))
+                    continue;
+
+                var latRef = latRefValue.Value;
+                var lonRef = lonRefValue.Value;
+                var latRaw = latValue.Value;
+                var lonRaw = lonValue.Value;
+                if (!TryParseGpsCoordinate(latRaw, latRef, out var latitude))
+                    continue;
+                if (!TryParseGpsCoordinate(lonRaw, lonRef, out var longitude))
+                    continue;
+
+                model.Latitude = latitude;
+                model.Longitude = longitude;
+                coordinateMessage = $"Coordinates loaded from photo metadata ({photo.Name}).";
+                return true;
+            }
+            catch
+            {
+                // Ignore metadata parsing failures and continue trying other photos.
+            }
+        }
+
+        return false;
+    }
+
+    private async Task<bool> TryApplyDeviceCoordinatesAsync(string successMessage)
+    {
+        try
+        {
+            var position = await JS.InvokeAsync<GeoPosition>("animalTrackerGetCurrentPosition", 10000);
+            model.Latitude = position.Latitude;
+            model.Longitude = position.Longitude;
+            if (position.Accuracy is > 0)
+                model.LocationAccuracyMeters = position.Accuracy;
+            coordinateMessage = successMessage;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            coordinateMessage = $"Could not get device location: {ex.Message}";
+            return false;
+        }
+    }
+
+    private static bool TryParseGpsCoordinate(object? rawValue, string? direction, out double coordinate)
+    {
+        coordinate = 0;
+        if (!TryReadDms(rawValue, out var degrees, out var minutes, out var seconds))
+            return false;
+
+        coordinate = Math.Abs(degrees) + (minutes / 60d) + (seconds / 3600d);
+        if (string.Equals(direction, "S", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(direction, "W", StringComparison.OrdinalIgnoreCase))
+        {
+            coordinate = -coordinate;
+        }
+
+        return true;
+    }
+
+    private static bool TryReadDms(object? rawValue, out double degrees, out double minutes, out double seconds)
+    {
+        degrees = 0;
+        minutes = 0;
+        seconds = 0;
+
+        if (rawValue is not System.Collections.IEnumerable values)
+            return false;
+
+        var parts = new List<double>(3);
+        foreach (var value in values)
+        {
+            if (!TryConvertExifPartToDouble(value, out var numeric))
+                continue;
+
+            parts.Add(numeric);
+            if (parts.Count == 3)
+                break;
+        }
+
+        if (parts.Count < 3)
+            return false;
+
+        degrees = parts[0];
+        minutes = parts[1];
+        seconds = parts[2];
+        return true;
+    }
+
+    private static bool TryConvertExifPartToDouble(object? value, out double numeric)
+    {
+        numeric = 0;
+        if (value is null)
+            return false;
+
+        if (value is Rational rational)
+        {
+            numeric = rational.Denominator == 0
+                ? 0
+                : (double)rational.Numerator / rational.Denominator;
+            return true;
+        }
+
+        try
+        {
+            numeric = Convert.ToDouble(value, System.Globalization.CultureInfo.InvariantCulture);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private async Task UploadPhotosAsync(InputFileChangeEventArgs e)
     {
         uploadError = null;
@@ -462,7 +664,10 @@ else
 
         try
         {
-            foreach (var file in e.GetMultipleFiles())
+            var files = e.GetMultipleFiles().ToList();
+            await TryAutoFillCoordinatesAsync(files);
+
+            foreach (var file in files)
             {
                 var stored = await Storage.SaveSightingPhotoAsync(file);
                 Db.SightingPhotos.Add(new SightingPhoto
@@ -529,14 +734,25 @@ else
     private sealed class Model
     {
         [System.ComponentModel.DataAnnotations.Required]
-        [System.ComponentModel.DataAnnotations.RegularExpression(@".*\S.*", ErrorMessage = "Species is required.")]
-        [System.ComponentModel.DataAnnotations.StringLength(200)]
-        public string SpeciesName { get; set; } = "";
+        public int? SpeciesId { get; set; }
 
         [System.ComponentModel.DataAnnotations.StringLength(200)]
         public string? LocationName { get; set; }
 
         public int? AnimalId { get; set; }
+
+        public SightingBehavior? Behavior { get; set; }
+        public SightingConfidence? SpeciesConfidence { get; set; }
+        public SightingConfidence? IndividualConfidence { get; set; }
+
+        [System.ComponentModel.DataAnnotations.Range(-90, 90)]
+        public double? Latitude { get; set; }
+
+        [System.ComponentModel.DataAnnotations.Range(-180, 180)]
+        public double? Longitude { get; set; }
+
+        [System.ComponentModel.DataAnnotations.Range(0.1, 100000)]
+        public double? LocationAccuracyMeters { get; set; }
 
         [System.ComponentModel.DataAnnotations.Required]
         public DateTime OccurredAtLocalDate { get; set; } = DateTime.Now.Date;
@@ -544,6 +760,7 @@ else
         public string OccurredAtLocalTime { get; set; } = DateTime.Now.ToString("HH:mm");
 
         public string? Notes { get; set; }
+        public DateTime? ObservedUntilLocal { get; set; }
 
         public DateTime GetOccurredAtUtc()
         {
@@ -561,6 +778,22 @@ else
 
             return local.ToUniversalTime();
         }
+
+        public DateTime? GetObservedUntilUtc()
+        {
+            if (ObservedUntilLocal is null)
+                return null;
+
+            var local = DateTime.SpecifyKind(ObservedUntilLocal.Value, DateTimeKind.Local);
+            return local.ToUniversalTime();
+        }
+    }
+
+    private sealed class GeoPosition
+    {
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
+        public double? Accuracy { get; set; }
     }
 }
 

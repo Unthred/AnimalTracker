@@ -1,0 +1,323 @@
+@page "/species"
+@rendermode InteractiveServer
+@namespace AnimalTracker.Components.Pages
+
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+
+@using AnimalTracker.Services
+@inject SpeciesLookupService SpeciesLookup
+@inject AppSettingsService AppSettings
+
+<PageTitle>Species lookup</PageTitle>
+
+<UIPageHeader Title="Species lookup" Description="Find species in your active region and view photo/reference details.">
+    <Actions>
+        <span class="text-xs font-medium text-slate-500 dark:text-slate-400">Active region: @activeRegionName</span>
+    </Actions>
+</UIPageHeader>
+
+@if (!string.IsNullOrWhiteSpace(error))
+{
+    <UIAlert Variant="UiAlertVariant.Danger" Class="mb-6">@error</UIAlert>
+}
+
+<UICard Class="mt-2">
+    <div class="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+        <div class="space-y-4">
+            <UIField Label="Search species" For="speciesLookupQuery" Hint="Type common or scientific name.">
+                <input id="speciesLookupQuery"
+                       type="search"
+                       class="w-full min-w-0 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80"
+                       placeholder="e.g. Red fox or Vulpes vulpes"
+                       @bind="query"
+                       @bind:event="oninput"
+                       @bind:after="SearchAsync" />
+            </UIField>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Taxa scope: Animals only.</p>
+
+            @if (!hasActiveRegion)
+            {
+                <p class="text-sm text-slate-600 dark:text-slate-300">Select a species region in Settings first.</p>
+            }
+            else if (!hasQuery)
+            {
+                <p class="text-sm text-slate-600 dark:text-slate-300">Start typing to see matching species.</p>
+            }
+            else if (!meetsMinQueryLength)
+            {
+                <p class="text-sm text-slate-600 dark:text-slate-300">Type at least @MinQueryLength characters to search.</p>
+            }
+            else if (results.Count == 0)
+            {
+                <p class="text-sm text-slate-600 dark:text-slate-300">No matching species found.</p>
+            }
+            else
+            {
+                <ul class="max-h-[26rem] divide-y divide-slate-200/80 overflow-auto rounded-xl border border-slate-200/80 dark:divide-slate-800/80 dark:border-slate-800/80">
+                    @foreach (var row in results)
+                    {
+                        var isSelected = selected?.Id == row.Id;
+                        <li>
+                            <button type="button"
+                                    class="block w-full px-4 py-3 text-left transition duration-150 hover:bg-slate-50 dark:hover:bg-slate-800/40 @(isSelected ? "bg-slate-100/90 dark:bg-slate-800/70" : "")"
+                                    @onclick="() => SelectSpeciesAsync(row.Id)">
+                                <div class="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">@row.Name</div>
+                                @if (!string.IsNullOrWhiteSpace(row.ScientificName))
+                                {
+                                    <div class="truncate text-xs italic text-slate-500 dark:text-slate-400">@row.ScientificName</div>
+                                }
+                            </button>
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+
+        <div class="min-w-0 rounded-xl border border-slate-200/90 bg-white/70 p-4 dark:border-slate-700 dark:bg-slate-900/60">
+            @if (!hasQuery)
+            {
+                <p class="text-sm text-slate-600 dark:text-slate-300">Type a species name to view details.</p>
+            }
+            else if (!meetsMinQueryLength)
+            {
+                <p class="text-sm text-slate-600 dark:text-slate-300">Keep typing to refine your search.</p>
+            }
+            else if (selected is null)
+            {
+                <p class="text-sm text-slate-600 dark:text-slate-300">Choose a species to view details.</p>
+            }
+            else
+            {
+                @if (loadingDetails)
+                {
+                    <p class="mb-3 text-xs text-slate-500 dark:text-slate-400">Loading species details…</p>
+                }
+                @if (!string.IsNullOrWhiteSpace(selected.ImageUrl))
+                {
+                    <div class="mb-4 overflow-hidden rounded-xl border border-slate-200/80 dark:border-slate-700/80">
+                        <img src="@selected.ImageUrl" alt="@selected.Name" class="h-56 w-full object-cover" decoding="async" loading="eager" />
+                    </div>
+                }
+
+                <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">@selected.Name</h2>
+                @if (!string.IsNullOrWhiteSpace(selected.ScientificName))
+                {
+                    <p class="mt-1 text-sm italic text-slate-500 dark:text-slate-400">@selected.ScientificName</p>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(GetCleanDescription(selected.Description)))
+                {
+                    <p class="mt-4 text-sm leading-relaxed text-slate-700 dark:text-slate-200">@GetCleanDescription(selected.Description)</p>
+                }
+                else
+                {
+                    <p class="mt-4 text-sm text-slate-600 dark:text-slate-300">No additional description available for this species yet.</p>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(selected.ActiveTimesSummary)
+                    || !string.IsNullOrWhiteSpace(selected.NestingPlacesSummary)
+                    || !string.IsNullOrWhiteSpace(selected.BehaviourTraitsSummary)
+                    || !string.IsNullOrWhiteSpace(selected.HabitatSummary)
+                    || !string.IsNullOrWhiteSpace(selected.HabitsSummary))
+                {
+                    <div class="mt-4 space-y-3">
+                        <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-50">Quick facts</h3>
+                        <p class="text-[11px] text-slate-500 dark:text-slate-400">Inferred from source summary text and may be incomplete.</p>
+                        @if (!string.IsNullOrWhiteSpace(selected.ActiveTimesSummary))
+                        {
+                            <div>
+                                <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Most active times</h4>
+                                <p class="mt-1 text-sm leading-relaxed text-slate-700 dark:text-slate-200">@selected.ActiveTimesSummary</p>
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(selected.NestingPlacesSummary))
+                        {
+                            <div>
+                                <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Likely nesting places</h4>
+                                <p class="mt-1 text-sm leading-relaxed text-slate-700 dark:text-slate-200">@selected.NestingPlacesSummary</p>
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(selected.BehaviourTraitsSummary))
+                        {
+                            <div>
+                                <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Behavioural traits</h4>
+                                <p class="mt-1 text-sm leading-relaxed text-slate-700 dark:text-slate-200">@selected.BehaviourTraitsSummary</p>
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(selected.HabitatSummary))
+                        {
+                            <div>
+                                <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Habitat</h4>
+                                <p class="mt-1 text-sm leading-relaxed text-slate-700 dark:text-slate-200">@selected.HabitatSummary</p>
+                            </div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(selected.HabitsSummary))
+                        {
+                            <div>
+                                <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Habits / behavior</h4>
+                                <p class="mt-1 text-sm leading-relaxed text-slate-700 dark:text-slate-200">@selected.HabitsSummary</p>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="mt-4 rounded-lg border border-slate-200/80 bg-slate-50/40 px-3 py-2 text-xs text-slate-600 dark:border-slate-700/80 dark:bg-slate-900/40 dark:text-slate-300">
+                        Quick facts are not available for this species from the current source summary.
+                    </div>
+                }
+
+                <div class="mt-4 space-y-1 text-xs text-slate-500 dark:text-slate-400">
+                    @if (!string.IsNullOrWhiteSpace(selected.TaxonGroup))
+                    {
+                        <p>Group: @selected.TaxonGroup</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(selected.ConservationStatus))
+                    {
+                        <p>Conservation status: @selected.ConservationStatus</p>
+                    }
+                    @if (selected.ObservationsCount is not null)
+                    {
+                        <p>iNaturalist observations: @selected.ObservationsCount.Value.ToString("N0")</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(selected.SourceLabel))
+                    {
+                        <p>Source: @selected.SourceLabel</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(selected.ImageLicense))
+                    {
+                        <p>Image license: @selected.ImageLicense</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(selected.ImageAttribution))
+                    {
+                        <p>Image attribution: @selected.ImageAttribution</p>
+                    }
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(selected.SourceUrl))
+                {
+                    <div class="mt-5 flex flex-wrap items-center gap-2">
+                        <UIButton Href="@selected.SourceUrl" target="_blank" rel="noreferrer noopener" Variant="UiButtonVariant.Outline" Size="UiButtonSize.Sm">
+                            View source
+                        </UIButton>
+                        @if (!string.IsNullOrWhiteSpace(selected.WikipediaUrl))
+                        {
+                            <UIButton Href="@selected.WikipediaUrl" target="_blank" rel="noreferrer noopener" Variant="UiButtonVariant.Outline" Size="UiButtonSize.Sm">
+                                Wikipedia
+                            </UIButton>
+                        }
+                    </div>
+                }
+                else if (!string.IsNullOrWhiteSpace(selected.WikipediaUrl))
+                {
+                    <div class="mt-5">
+                        <UIButton Href="@selected.WikipediaUrl" target="_blank" rel="noreferrer noopener" Variant="UiButtonVariant.Outline" Size="UiButtonSize.Sm">
+                            Wikipedia
+                        </UIButton>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+</UICard>
+
+@code {
+    private string query = string.Empty;
+    private List<SpeciesLookupItem> results = [];
+    private SpeciesLookupDetails? selected;
+    private string? error;
+    private bool hasActiveRegion;
+    private string activeRegionName = "Not selected";
+    private bool loadingDetails;
+    private const int MinQueryLength = 3;
+    private bool hasQuery => !string.IsNullOrWhiteSpace(query);
+    private bool meetsMinQueryLength => query.Trim().Length >= MinQueryLength;
+    private readonly Dictionary<int, SpeciesLookupDetails> detailsCache = [];
+
+    private static string? GetCleanDescription(string? description)
+    {
+        if (string.IsNullOrWhiteSpace(description))
+            return null;
+
+        var withoutTags = System.Text.RegularExpressions.Regex.Replace(description, "<[^>]+>", " ");
+        var decoded = System.Net.WebUtility.HtmlDecode(withoutTags);
+        var normalized = System.Text.RegularExpressions.Regex.Replace(decoded, @"\s+", " ").Trim();
+        return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadActiveRegionAsync();
+        if (!hasActiveRegion)
+            return;
+
+        await SearchAsync();
+    }
+
+    private async Task LoadActiveRegionAsync()
+    {
+        var settings = await AppSettings.GetOrCreateAsync();
+        hasActiveRegion = !string.IsNullOrWhiteSpace(settings.ActiveSpeciesRegionKey);
+        activeRegionName = string.IsNullOrWhiteSpace(settings.ActiveSpeciesRegionName)
+            ? "Not selected"
+            : settings.ActiveSpeciesRegionName;
+    }
+
+    private async Task SearchAsync()
+    {
+        error = null;
+        selected = null;
+        if (!hasActiveRegion)
+        {
+            results = [];
+            return;
+        }
+
+        var trimmedQuery = query.Trim();
+        if (string.IsNullOrWhiteSpace(trimmedQuery) || trimmedQuery.Length < MinQueryLength)
+        {
+            results = [];
+            return;
+        }
+
+        try
+        {
+            results = await SpeciesLookup.SearchActiveRegionAsync(trimmedQuery, take: 30);
+            if (results.Count == 1)
+                await SelectSpeciesAsync(results[0].Id);
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            results = [];
+        }
+    }
+
+    private async Task SelectSpeciesAsync(int speciesId)
+    {
+        error = null;
+        try
+        {
+            if (detailsCache.TryGetValue(speciesId, out var cached))
+            {
+                selected = cached;
+                return;
+            }
+
+            loadingDetails = true;
+            selected = await SpeciesLookup.GetDetailsAsync(speciesId);
+            if (selected is not null)
+                detailsCache[speciesId] = selected;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            selected = null;
+        }
+        finally
+        {
+            loadingDetails = false;
+        }
+    }
+}

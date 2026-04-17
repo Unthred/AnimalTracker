@@ -3,16 +3,19 @@ using System;
 using AnimalTracker.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace AnimalTracker.Migrations
+namespace AnimalTracker.Data.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260417141347_AddUserLastLoginAudit")]
+    partial class AddUserLastLoginAudit
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.5");
@@ -141,14 +144,6 @@ namespace AnimalTracker.Migrations
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
-
-                    b.Property<string>("ActiveSpeciesRegionKey")
-                        .HasMaxLength(100)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ActiveSpeciesRegionName")
-                        .HasMaxLength(200)
-                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .ValueGeneratedOnAdd()
@@ -378,40 +373,6 @@ namespace AnimalTracker.Migrations
                         .IsUnique();
 
                     b.ToTable("Species");
-                });
-
-            modelBuilder.Entity("AnimalTracker.Data.Entities.SpeciesRegionCache", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("RegionKey")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("RegionName")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("SpeciesId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("SyncedAtUtc")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("RegionKey");
-
-                    b.HasIndex("SpeciesId");
-
-                    b.HasIndex("RegionKey", "SpeciesId")
-                        .IsUnique();
-
-                    b.ToTable("SpeciesRegionCaches");
                 });
 
             modelBuilder.Entity("AnimalTracker.Data.Entities.UserSettings", b =>
@@ -663,17 +624,6 @@ namespace AnimalTracker.Migrations
                         .IsRequired();
 
                     b.Navigation("Sighting");
-                });
-
-            modelBuilder.Entity("AnimalTracker.Data.Entities.SpeciesRegionCache", b =>
-                {
-                    b.HasOne("AnimalTracker.Data.Entities.Species", "Species")
-                        .WithMany()
-                        .HasForeignKey("SpeciesId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Species");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>

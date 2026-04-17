@@ -68,6 +68,16 @@ public sealed class AppSettingsService(ApplicationDbContext db, PhotoStorageServ
         return settings;
     }
 
+    public async Task<AppSettings> UpdateActiveSpeciesRegionAsync(string? regionKey, string? regionName, CancellationToken cancellationToken = default)
+    {
+        var settings = await GetOrCreateAsync(cancellationToken);
+        settings.ActiveSpeciesRegionKey = string.IsNullOrWhiteSpace(regionKey) ? null : regionKey.Trim();
+        settings.ActiveSpeciesRegionName = string.IsNullOrWhiteSpace(regionName) ? null : regionName.Trim();
+        settings.UpdatedAtUtc = DateTime.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+        return settings;
+    }
+
     public async Task<AppSettings> SetDefaultAuthImageAsync(IBrowserFile file, CancellationToken cancellationToken = default)
     {
         var stored = await photos.SaveAuthPageImageAsync(file, cancellationToken: cancellationToken);

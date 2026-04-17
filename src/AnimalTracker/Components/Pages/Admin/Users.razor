@@ -42,6 +42,9 @@
                             }
                             <span class="mr-2">Confirmed: @(u.EmailConfirmed ? "Yes" : "No")</span>
                             <span>Locked: @(u.IsLockedOut ? "Yes" : "No")</span>
+                            <span class="mx-2">·</span>
+                            <span class="mr-2">Last login: @(u.LastLoginAtUtc is null ? "Never" : u.LastLoginAtUtc.Value.ToLocalTime().ToString("g"))</span>
+                            <span>IP: @FormatIp(u.LastLoginIpAddress)</span>
                         </div>
                     </div>
 
@@ -247,5 +250,14 @@
         [System.ComponentModel.DataAnnotations.Required]
         public string DefaultThemeMode { get; set; } = "system";
     }
+
+    private static string FormatIp(string? ip) =>
+        ip switch
+        {
+            null or "" => "Unknown",
+            "::1" => "localhost (::1)",
+            "127.0.0.1" => "localhost (127.0.0.1)",
+            _ => ip
+        };
 }
 

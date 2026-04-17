@@ -12,6 +12,7 @@
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
 @inject AnimalTracker.Services.AppSettingsService AppSettings
+@inject AnimalTracker.Services.LoginAuditService LoginAudit
 @inject ApplicationDbContext Db
 
 <PageTitle>Log in</PageTitle>
@@ -145,6 +146,11 @@ else
         if (result.Succeeded)
         {
             Logger.LogInformation("User logged in.");
+            var user = await SignInManager.UserManager.GetUserAsync(HttpContext.User);
+            if (user is null && !string.IsNullOrWhiteSpace(Input.Email))
+                user = await UserManager.FindByEmailAsync(Input.Email);
+            if (user is not null)
+                await LoginAudit.RecordSuccessfulLoginAsync(user);
             await SetThemeCookieForSignedInUserAsync();
             RedirectManager.RedirectTo(ReturnUrl);
         }

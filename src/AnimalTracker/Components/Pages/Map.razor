@@ -1,0 +1,170 @@
+@page "/map"
+@rendermode InteractiveServer
+
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+
+@using AnimalTracker.Data.Entities
+@using AnimalTracker.Services
+@inject SightingService Sightings
+@inject SpeciesService Species
+@inject AnimalService Animals
+@inject IJSRuntime JS
+
+<PageTitle>Map</PageTitle>
+
+<UIPageHeader Title="Sightings map" Description="Explore sightings and territory overlays from geotagged observations." />
+
+<UICard Class="mt-2">
+    <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <UIField Label="Species" For="species">
+            <input id="species"
+                   list="species-options"
+                   class="w-full min-w-0 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80"
+                   placeholder="All species"
+                   autocomplete="off"
+                   value="@selectedSpeciesName"
+                   @oninput="OnSpeciesInputAsync" />
+            <datalist id="species-options">
+                @foreach (var s in species)
+                {
+                    <option value="@s.Name"></option>
+                }
+            </datalist>
+        </UIField>
+        <UIField Label="Animal" For="animal">
+            <input id="animal"
+                   list="animal-options"
+                   class="w-full min-w-0 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80"
+                   placeholder="All animals"
+                   autocomplete="off"
+                   value="@selectedAnimalLabel"
+                   @oninput="OnAnimalInputAsync" />
+            <datalist id="animal-options">
+                @foreach (var a in animals)
+                {
+                    <option value="@GetAnimalFilterLabel(a)"></option>
+                }
+            </datalist>
+        </UIField>
+        <UIField Label="From date" For="fromDate">
+            <InputDate id="fromDate" class="w-full min-w-0 px-3 py-2.5" @bind-Value="fromLocalDate" @bind-Value:after="ReloadAsync" />
+        </UIField>
+        <UIField Label="To date" For="toDate">
+            <InputDate id="toDate" class="w-full min-w-0 px-3 py-2.5" @bind-Value="toLocalDate" @bind-Value:after="ReloadAsync" />
+        </UIField>
+    </div>
+</UICard>
+
+<UICard Class="mt-6">
+    <div class="mb-4 flex flex-wrap items-center gap-4 text-sm text-slate-600 dark:text-slate-300">
+        <span>@points.Count geotagged sightings</span>
+        <span>@territories.Count inferred territories</span>
+    </div>
+    <div id="@mapContainerId" style="height: 560px; border-radius: 0.9rem; overflow: hidden;"></div>
+</UICard>
+
+@if (territories.Count > 0)
+{
+    <UICard Title="Territory summaries" Class="mt-6">
+        <ul class="divide-y divide-slate-200/80 dark:divide-slate-800/80">
+            @foreach (var t in territories)
+            {
+                <li class="py-3 text-sm">
+                    <div class="font-semibold text-slate-900 dark:text-slate-50">@t.AnimalLabel · @t.SpeciesName</div>
+                    <div class="mt-1 text-slate-600 dark:text-slate-300">
+                        @t.CoordinateSightings sightings · radius ~@Math.Round(t.RadiusMeters)m · active @t.BestActivityWindowLocal · hunting @t.HuntingSightings
+                    </div>
+                </li>
+            }
+        </ul>
+    </UICard>
+}
+
+@code {
+    private readonly string mapContainerId = $"sightings-map-{Guid.NewGuid():N}";
+    private List<Species> species = [];
+    private List<Animal> animals = [];
+    private List<SightingMapPoint> points = [];
+    private List<AnimalTerritorySummary> territories = [];
+    private string? selectedSpeciesName;
+    private string? selectedAnimalLabel;
+    private DateTime? fromLocalDate;
+    private DateTime? toLocalDate;
+    private bool shouldRenderMap;
+
+    protected override async Task OnInitializedAsync()
+    {
+        species = await Species.GetAllAsync();
+        animals = await Animals.SearchAsync(query: null, speciesId: null);
+        await ReloadAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender && !shouldRenderMap)
+            return;
+
+        shouldRenderMap = false;
+        await JS.InvokeVoidAsync("animalTrackerMap.render", mapContainerId, points, territories);
+    }
+
+    private async Task ReloadAsync()
+    {
+        DateTime? fromUtc = fromLocalDate.HasValue
+            ? DateTime.SpecifyKind(fromLocalDate.Value.Date, DateTimeKind.Local).ToUniversalTime()
+            : null;
+        DateTime? toUtc = toLocalDate.HasValue
+            ? DateTime.SpecifyKind(toLocalDate.Value.Date.AddDays(1).AddTicks(-1), DateTimeKind.Local).ToUniversalTime()
+            : null;
+
+        var filters = new SightingFilters(
+            FromUtc: fromUtc,
+            ToUtc: toUtc,
+            SpeciesId: ResolveSpeciesId(selectedSpeciesName),
+            LocationId: null,
+            AnimalId: ResolveAnimalId(selectedAnimalLabel),
+            UnknownOnly: false,
+            WithCoordinatesOnly: true,
+            MaxLocationAccuracyMeters: null);
+
+        points = await Sightings.GetMapPointsAsync(take: 2500, filters);
+        territories = await Sightings.GetTerritorySummariesAsync(fromUtc, toUtc, take: 24);
+        shouldRenderMap = true;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task OnSpeciesInputAsync(ChangeEventArgs e)
+    {
+        selectedSpeciesName = e.Value?.ToString();
+        await ReloadAsync();
+    }
+
+    private async Task OnAnimalInputAsync(ChangeEventArgs e)
+    {
+        selectedAnimalLabel = e.Value?.ToString();
+        await ReloadAsync();
+    }
+
+    private int? ResolveSpeciesId(string? name)
+    {
+        var trimmed = (name ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(trimmed))
+            return null;
+
+        return species.FirstOrDefault(x => string.Equals(x.Name, trimmed, StringComparison.OrdinalIgnoreCase))?.Id;
+    }
+
+    private int? ResolveAnimalId(string? animalLabel)
+    {
+        var trimmed = (animalLabel ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(trimmed))
+            return null;
+
+        return animals.FirstOrDefault(x =>
+            string.Equals(GetAnimalFilterLabel(x), trimmed, StringComparison.OrdinalIgnoreCase))?.Id;
+    }
+
+    private static string GetAnimalFilterLabel(Animal a) =>
+        !string.IsNullOrWhiteSpace(a.DisplayName) ? a.DisplayName : $"Animal #{a.Id} · {a.Species.Name}";
+}

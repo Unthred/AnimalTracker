@@ -2,6 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes app-progress-indeterminate {
+  0% { transform: translateX(-40%); width: 35%; }
+  50% { transform: translateX(35%); width: 45%; }
+  100% { transform: translateX(110%); width: 35%; }
+}
+
+.app-progress-indeterminate {
+  animation: app-progress-indeterminate 1.15s ease-in-out infinite;
+  will-change: transform, width;
+}
+
 @layer base {
   :root {
     /* Keep native controls light unless we explicitly enable dark mode via the `dark` class. */
@@ -40,6 +51,16 @@
   /* Transparent so full-page backgrounds (MainLayout) paint above the canvas; routes supply their own base fill. */
   html, body {
     @apply min-h-dvh bg-transparent font-sans text-slate-900 antialiased leading-relaxed dark:text-slate-50;
+    /*
+      Keep layout width stable when pages switch between needing/not needing vertical scrollbars.
+      This prevents nav/content horizontal "jumps" between routes.
+    */
+    scrollbar-gutter: stable;
+  }
+
+  /* Fallback for engines that don't honor scrollbar-gutter reliably. */
+  html {
+    overflow-y: scroll;
   }
 
   a {

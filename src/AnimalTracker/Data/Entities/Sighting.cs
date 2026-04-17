@@ -7,6 +7,7 @@ public sealed class Sighting
     public int Id { get; set; }
 
     public DateTime OccurredAtUtc { get; set; }
+    public DateTime? ObservedUntilUtc { get; set; }
 
     public int LocationId { get; set; }
     public Location Location { get; set; } = null!;
@@ -16,6 +17,13 @@ public sealed class Sighting
 
     public int? AnimalId { get; set; }
     public Animal? Animal { get; set; }
+
+    public double? Latitude { get; set; }
+    public double? Longitude { get; set; }
+    public double? LocationAccuracyMeters { get; set; }
+    public SightingBehavior? Behavior { get; set; }
+    public SightingConfidence? SpeciesConfidence { get; set; }
+    public SightingConfidence? IndividualConfidence { get; set; }
 
     [MaxLength(4000)]
     public string? Notes { get; set; }

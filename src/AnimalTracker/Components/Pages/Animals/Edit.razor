@@ -9,6 +9,7 @@
 @using AnimalTracker.Data.Entities
 @inject AnimalService Animals
 @inject SpeciesService Species
+@inject AppSettingsService AppSettings
 @inject NavigationManager Nav
 
 <PageTitle>Edit Animal</PageTitle>
@@ -25,6 +26,12 @@ else
 {
     <UIPageHeader Title="Edit animal" Description="Fix name, species, or notes for this profile." />
 
+    <div class="mb-4">
+        <span class="inline-flex items-center rounded-full border border-slate-200/90 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+            Species region: @(string.IsNullOrWhiteSpace(activeSpeciesRegionName) ? "Not selected" : activeSpeciesRegionName)
+        </span>
+    </div>
+
     @if (!string.IsNullOrWhiteSpace(error))
     {
         <UIAlert Variant="UiAlertVariant.Danger" Class="mb-8">@error</UIAlert>
@@ -35,19 +42,23 @@ else
             <DataAnnotationsValidator />
 
             <UIField Label="Species" For="species">
-                <InputText id="species"
-                           list="species-options"
-                           class="w-full min-w-0 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80"
-                           placeholder="Select or type a new species"
-                           autocomplete="off"
-                           @bind-Value="model.SpeciesName" />
-                <datalist id="species-options">
+                <select id="species" class="w-full min-w-0 px-3 py-2.5" @bind="model.SpeciesId">
+                    <option value="">Select…</option>
                     @foreach (var s in species)
                     {
-                        <option value="@s.Name"></option>
+                        <option value="@s.Id">@s.Name</option>
                     }
-                </datalist>
-                <ValidationMessage For="() => model.SpeciesName" />
+                </select>
+                @if (species.Count == 0)
+                {
+                    <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">Select a species region in Settings to load this list.</p>
+                }
+                <div class="mt-2">
+                    <UIButton Href="/species" target="_blank" rel="noreferrer noopener" Variant="UiButtonVariant.Outline" Size="UiButtonSize.Sm">
+                        Lookup species
+                    </UIButton>
+                </div>
+                <ValidationMessage For="() => model.SpeciesId" />
             </UIField>
 
             <UIField Label="Name (optional)" For="displayName">
@@ -79,6 +90,7 @@ else
     private Animal? animal;
     private List<Species> species = [];
     private string? error;
+    private string? activeSpeciesRegionName;
 
     private readonly Model model = new();
 
@@ -87,11 +99,13 @@ else
         loading = true;
         error = null;
 
+        var appSettings = await AppSettings.GetOrCreateAsync();
+        activeSpeciesRegionName = appSettings.ActiveSpeciesRegionName;
         species = await Species.GetAllAsync();
         animal = await Animals.GetAsync(Id);
         if (animal is not null)
         {
-            model.SpeciesName = species.FirstOrDefault(x => x.Id == animal.SpeciesId)?.Name ?? animal.Species.Name;
+            model.SpeciesId = animal.SpeciesId;
             model.DisplayName = animal.DisplayName;
             model.IdentifyingFeatures = animal.IdentifyingFeatures;
             model.Notes = animal.Notes;
@@ -105,10 +119,9 @@ else
         error = null;
         try
         {
-            var speciesId = await ResolveSpeciesIdAsync();
             var updated = await Animals.UpdateAsync(
                 id: Id,
-                speciesId: speciesId,
+                speciesId: model.SpeciesId!.Value,
                 displayName: model.DisplayName,
                 identifyingFeatures: model.IdentifyingFeatures,
                 notes: model.Notes);
@@ -121,24 +134,10 @@ else
         }
     }
 
-    private async Task<int> ResolveSpeciesIdAsync()
-    {
-        var speciesName = (model.SpeciesName ?? "").Trim();
-        var existingSpecies = species.FirstOrDefault(x => string.Equals(x.Name, speciesName, StringComparison.OrdinalIgnoreCase));
-        if (existingSpecies is not null)
-            return existingSpecies.Id;
-
-        var createdSpecies = await Species.CreateAsync(speciesName, description: null);
-        species = species.Append(createdSpecies).OrderBy(x => x.Name).ToList();
-        return createdSpecies.Id;
-    }
-
     private sealed class Model
     {
         [System.ComponentModel.DataAnnotations.Required]
-        [System.ComponentModel.DataAnnotations.RegularExpression(@".*\S.*", ErrorMessage = "Species is required.")]
-        [System.ComponentModel.DataAnnotations.StringLength(200)]
-        public string SpeciesName { get; set; } = "";
+        public int? SpeciesId { get; set; }
 
         public string? DisplayName { get; set; }
         public string? IdentifyingFeatures { get; set; }

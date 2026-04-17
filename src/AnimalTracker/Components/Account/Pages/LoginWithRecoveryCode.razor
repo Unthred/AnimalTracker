@@ -8,6 +8,7 @@
 @inject UserManager<ApplicationUser> UserManager
 @inject IdentityRedirectManager RedirectManager
 @inject ILogger<LoginWithRecoveryCode> Logger
+@inject AnimalTracker.Services.LoginAuditService LoginAudit
 
 <PageTitle>Recovery code verification</PageTitle>
 
@@ -63,6 +64,7 @@
         if (result.Succeeded)
         {
             Logger.LogInformation("User with ID '{UserId}' logged in with a recovery code.", userId);
+            await LoginAudit.RecordSuccessfulLoginAsync(user);
             RedirectManager.RedirectTo(ReturnUrl);
         }
         else if (result.IsLockedOut)

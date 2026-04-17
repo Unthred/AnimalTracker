@@ -8,6 +8,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 {
     public DbSet<Location> Locations => Set<Location>();
     public DbSet<Species> Species => Set<Species>();
+    public DbSet<SpeciesRegionCache> SpeciesRegionCaches => Set<SpeciesRegionCache>();
     public DbSet<Animal> Animals => Set<Animal>();
     public DbSet<Sighting> Sightings => Set<Sighting>();
     public DbSet<SightingPhoto> SightingPhotos => Set<SightingPhoto>();
@@ -30,6 +31,13 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             e.HasIndex(x => x.Name).IsUnique();
         });
 
+        builder.Entity<SpeciesRegionCache>(e =>
+        {
+            e.HasIndex(x => new { x.RegionKey, x.SpeciesId }).IsUnique();
+            e.HasIndex(x => x.RegionKey);
+            e.Property(x => x.SyncedAtUtc).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        });
+
         builder.Entity<Animal>(e =>
         {
             e.HasIndex(x => new { x.OwnerUserId, x.SpeciesId, x.DisplayName });
@@ -42,6 +50,11 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             e.HasIndex(x => new { x.OwnerUserId, x.OccurredAtUtc });
             e.HasIndex(x => new { x.OwnerUserId, x.SpeciesId, x.OccurredAtUtc });
             e.HasIndex(x => new { x.OwnerUserId, x.AnimalId, x.OccurredAtUtc });
+            e.HasIndex(x => new { x.OwnerUserId, x.Latitude, x.Longitude });
+
+            e.Property(x => x.Latitude).HasPrecision(9, 6);
+            e.Property(x => x.Longitude).HasPrecision(9, 6);
+            e.Property(x => x.LocationAccuracyMeters).HasPrecision(8, 2);
 
             e.Property(x => x.CreatedAtUtc).HasDefaultValueSql("CURRENT_TIMESTAMP");
             e.Property(x => x.UpdatedAtUtc).HasDefaultValueSql("CURRENT_TIMESTAMP");

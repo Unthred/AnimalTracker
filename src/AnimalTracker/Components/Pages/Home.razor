@@ -10,6 +10,7 @@
 @inject SightingService Sightings
 @inject SpeciesService Species
 @inject LocationService Locations
+@inject AnimalService Animals
 @inject AnimalTracker.State.UserPreferencesState Prefs
 
 <PageTitle>Timeline</PageTitle>
@@ -22,7 +23,7 @@
 
 <UICard Class="mt-2">
     <div class="min-w-0 space-y-6">
-        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8 lg:grid-cols-2">
+        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8 lg:grid-cols-3">
             <UIField Label="Species" For="species">
                 <input id="species"
                        list="species-options"
@@ -54,9 +55,41 @@
                     }
                 </datalist>
             </UIField>
+
+            <UIField Label="Animal" For="animal">
+                <input id="animal"
+                       list="animal-options"
+                       class="w-full min-w-0 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80"
+                       placeholder="All or type to filter"
+                       autocomplete="off"
+                       value="@selectedAnimalLabel"
+                       @oninput="OnAnimalInputAsync" />
+                <datalist id="animal-options">
+                    @foreach (var a in animals)
+                    {
+                        <option value="@GetAnimalFilterLabel(a)"></option>
+                    }
+                </datalist>
+            </UIField>
         </div>
 
-        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:items-end sm:gap-8">
+        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 sm:items-end sm:gap-8">
+            <UIField Label="From date" For="fromDate">
+                <UIDatePicker id="fromDate"
+                              @bind-NullableValue="fromLocalDate"
+                              @bind-NullableValue:after="OnFiltersChangedAsync" />
+            </UIField>
+            <UIField Label="To date" For="toDate">
+                <UIDatePicker id="toDate"
+                              @bind-NullableValue="toLocalDate"
+                              @bind-NullableValue:after="OnFiltersChangedAsync" />
+            </UIField>
+            <UIField Label="Max GPS accuracy (m)" For="maxAccuracy">
+                <InputNumber id="maxAccuracy"
+                             class="w-full min-w-0 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80"
+                             @bind-Value="maxLocationAccuracyMeters"
+                             @bind-Value:after="OnFiltersChangedAsync" />
+            </UIField>
             <div class="flex flex-col justify-end">
                 <label for="unknownOnly" class="inline-flex cursor-pointer items-center gap-3 text-sm font-medium text-slate-700 dark:text-slate-200">
                     <input id="unknownOnly" type="checkbox"
@@ -67,6 +100,17 @@
                 </label>
                 <p class="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-400">Only sightings without a linked animal.</p>
             </div>
+        </div>
+
+        <div class="flex flex-col justify-end">
+            <label for="coordinatesOnly" class="inline-flex cursor-pointer items-center gap-3 text-sm font-medium text-slate-700 dark:text-slate-200">
+                <input id="coordinatesOnly" type="checkbox"
+                       class="checkbox-soft size-[1.125rem] shrink-0"
+                       @bind="coordinatesOnly"
+                       @bind:after="OnFiltersChangedAsync" />
+                Coordinates only
+            </label>
+            <p class="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-400">Show only sightings with latitude/longitude for map and territory analysis.</p>
         </div>
     </div>
 </UICard>
@@ -105,6 +149,19 @@
                                 <div class="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
                                     @s.OccurredAtUtc.ToLocalTime().ToString("g") · @s.Location.Name
                                 </div>
+                                @if (s.Behavior is not null || (s.Latitude is not null && s.Longitude is not null))
+                                {
+                                    <div class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                                        @if (s.Behavior is not null)
+                                        {
+                                            <span>Behavior: @s.Behavior</span>
+                                        }
+                                        @if (s.Latitude is not null && s.Longitude is not null)
+                                        {
+                                            <span class="ml-2">GPS: @s.Latitude.Value.ToString("0.00000"), @s.Longitude.Value.ToString("0.00000")</span>
+                                        }
+                                    </div>
+                                }
                                 @if (!string.IsNullOrWhiteSpace(s.Notes))
                                 {
                                     <div class="mt-2 text-sm leading-relaxed text-slate-700 dark:text-slate-200">@s.Notes</div>
@@ -129,13 +186,20 @@
     private bool loading = true;
     private List<Species> species = [];
     private List<Location> locations = [];
+    private List<Animal> animals = [];
     private List<Sighting> sightings = [];
     private CancellationTokenSource? filterDebounceCts;
 
     private string? selectedSpeciesName;
     private string? selectedLocationName;
+    private string? selectedAnimalLabel;
     private int? selectedSpeciesId;
     private int? selectedLocationId;
+    private int? selectedAnimalId;
+    private DateTime? fromLocalDate;
+    private DateTime? toLocalDate;
+    private bool coordinatesOnly;
+    private double? maxLocationAccuracyMeters;
     private bool unknownOnly;
 
     protected override void OnInitialized() =>
@@ -155,6 +219,7 @@
     {
         species = await Species.GetAllAsync();
         locations = await Locations.GetAllAsync();
+        animals = await Animals.SearchAsync(query: null, speciesId: null);
         await ReloadAsync();
     }
 
@@ -163,13 +228,23 @@
         loading = true;
         selectedSpeciesId = ResolveSpeciesId(selectedSpeciesName);
         selectedLocationId = ResolveLocationId(selectedLocationName);
+        selectedAnimalId = ResolveAnimalId(selectedAnimalLabel);
+
+        DateTime? fromUtc = fromLocalDate.HasValue
+            ? DateTime.SpecifyKind(fromLocalDate.Value.Date, DateTimeKind.Local).ToUniversalTime()
+            : null;
+        DateTime? toUtc = toLocalDate.HasValue
+            ? DateTime.SpecifyKind(toLocalDate.Value.Date.AddDays(1).AddTicks(-1), DateTimeKind.Local).ToUniversalTime()
+            : null;
         var filters = new SightingFilters(
-            FromUtc: null,
-            ToUtc: null,
+            FromUtc: fromUtc,
+            ToUtc: toUtc,
             SpeciesId: selectedSpeciesId,
             LocationId: selectedLocationId,
-            AnimalId: null,
-            UnknownOnly: unknownOnly);
+            AnimalId: selectedAnimalId,
+            UnknownOnly: unknownOnly,
+            WithCoordinatesOnly: coordinatesOnly,
+            MaxLocationAccuracyMeters: maxLocationAccuracyMeters);
 
         var take = Prefs.TimelinePageSize is > 0 and <= 200 ? Prefs.TimelinePageSize : 50;
         sightings = await Sightings.GetRecentAsync(take, filters);
@@ -194,6 +269,20 @@
         return locations.FirstOrDefault(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase))?.Id;
     }
 
+    private int? ResolveAnimalId(string? animalLabel)
+    {
+        var label = (animalLabel ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(label))
+            return null;
+
+        var byDisplay = animals.FirstOrDefault(x =>
+            string.Equals(GetAnimalFilterLabel(x), label, StringComparison.OrdinalIgnoreCase));
+        if (byDisplay is not null)
+            return byDisplay.Id;
+
+        return null;
+    }
+
     private async Task OnSpeciesInputAsync(ChangeEventArgs e)
     {
         selectedSpeciesName = e.Value?.ToString();
@@ -206,7 +295,16 @@
         await ScheduleReloadAsync();
     }
 
+    private async Task OnAnimalInputAsync(ChangeEventArgs e)
+    {
+        selectedAnimalLabel = e.Value?.ToString();
+        await ScheduleReloadAsync();
+    }
+
     private Task OnFiltersChangedAsync() => ScheduleReloadAsync();
+
+    private static string GetAnimalFilterLabel(Animal a) =>
+        !string.IsNullOrWhiteSpace(a.DisplayName) ? a.DisplayName : $"Animal #{a.Id} · {a.Species.Name}";
 
     private async Task ScheduleReloadAsync()
     {

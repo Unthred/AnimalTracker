@@ -1,5 +1,4 @@
 @using System.Globalization
-@inherits InputBase<DateTime>
 
 <div class="relative" @onkeydown="OnKeyDown">
     <div class="relative">
@@ -7,6 +6,7 @@
                 class="@InputClass"
                 aria-haspopup="dialog"
                 aria-expanded="@(open ? "true" : "false")"
+                @attributes="AdditionalAttributes"
                 @onclick="Toggle">
             <span class="min-w-0 truncate text-left">@DisplayText</span>
 
@@ -83,6 +83,11 @@
 @code {
     [Parameter] public string Placeholder { get; set; } = "DD/MM/YYYY";
     [Parameter] public string? Class { get; set; }
+    [Parameter] public DateTime Value { get; set; }
+    [Parameter] public EventCallback<DateTime> ValueChanged { get; set; }
+    [Parameter] public DateTime? NullableValue { get; set; }
+    [Parameter] public EventCallback<DateTime?> NullableValueChanged { get; set; }
+    [Parameter(CaptureUnmatchedValues = true)] public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
 
     private bool open;
     private DateTime cursorMonth;
@@ -91,23 +96,25 @@
     private string? validationMessage;
 
     private static readonly string[] WeekdayHeaders = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
+    private bool IsNullableMode => NullableValueChanged.HasDelegate;
+    private DateTime EffectiveValue => IsNullableMode ? (NullableValue ?? DateTime.Today) : (Value == default ? DateTime.Today : Value);
+    private DateTime? SelectedValue => IsNullableMode ? NullableValue?.Date : EffectiveValue.Date;
 
     protected override void OnInitialized()
     {
-        cursorMonth = new DateTime(CurrentValue.Year, CurrentValue.Month, 1);
-        textValue = Format(CurrentValue);
+        cursorMonth = new DateTime(EffectiveValue.Year, EffectiveValue.Month, 1);
+        textValue = IsNullableMode && NullableValue is null ? "" : Format(EffectiveValue);
     }
 
     protected override void OnParametersSet()
     {
-        // Keep the displayed text in sync when the model changes externally.
-        var formatted = Format(CurrentValue);
+        var formatted = IsNullableMode && NullableValue is null ? "" : Format(EffectiveValue);
         if (!string.Equals(textValue, formatted, StringComparison.Ordinal))
             textValue = formatted;
-        cursorMonth = new DateTime(CurrentValue.Year, CurrentValue.Month, 1);
+        cursorMonth = new DateTime(EffectiveValue.Year, EffectiveValue.Month, 1);
     }
 
-    private string DisplayText => string.IsNullOrWhiteSpace(Format(CurrentValue)) ? Placeholder : Format(CurrentValue);
+    private string DisplayText => string.IsNullOrWhiteSpace(textValue) ? Placeholder : textValue;
 
     private string InputClass => string.Join(' ', new[]
     {
@@ -134,8 +141,6 @@
         {
             var first = new DateTime(cursorMonth.Year, cursorMonth.Month, 1);
             var daysInMonth = DateTime.DaysInMonth(cursorMonth.Year, cursorMonth.Month);
-
-            // Monday = 0, Sunday = 6
             var offset = ((int)first.DayOfWeek + 6) % 7;
 
             var list = new List<DateTime?>(42);
@@ -158,39 +163,34 @@
         showValidationMessage = false;
     }
 
-    private void PrevMonth()
-    {
-        cursorMonth = cursorMonth.AddMonths(-1);
-    }
+    private void PrevMonth() => cursorMonth = cursorMonth.AddMonths(-1);
+    private void NextMonth() => cursorMonth = cursorMonth.AddMonths(1);
+    private Task Today() => Select(DateTime.Today);
 
-    private void NextMonth()
-    {
-        cursorMonth = cursorMonth.AddMonths(1);
-    }
-
-    private void Today()
-    {
-        Select(DateTime.Today);
-    }
-
-    private void Select(DateTime date)
+    private async Task Select(DateTime date)
     {
         var v = date.Date;
-        CurrentValue = v;
+        await SetDateAsync(v);
         textValue = Format(v);
         cursorMonth = new DateTime(v.Year, v.Month, 1);
         Close();
     }
 
-    private void OnTextInput(ChangeEventArgs e)
+    private async Task OnTextInput(ChangeEventArgs e)
     {
         textValue = e.Value?.ToString() ?? "";
         showValidationMessage = false;
 
+        if (IsNullableMode && string.IsNullOrWhiteSpace(textValue))
+        {
+            await SetDateAsync(null);
+            return;
+        }
+
         if (TryParseDate(textValue, out var dt))
         {
-            CurrentValue = dt.Date;
-            cursorMonth = new DateTime(CurrentValue.Year, CurrentValue.Month, 1);
+            await SetDateAsync(dt.Date);
+            cursorMonth = new DateTime(dt.Year, dt.Month, 1);
         }
         else if (!string.IsNullOrWhiteSpace(textValue))
         {
@@ -199,7 +199,7 @@
         }
     }
 
-    private void OnKeyDown(KeyboardEventArgs e)
+    private async Task OnKeyDown(KeyboardEventArgs e)
     {
         if (!open)
             return;
@@ -210,8 +210,7 @@
             return;
         }
 
-        // Minimal keyboard support: arrows move by day, PgUp/PgDn month, Home/End week.
-        var baseDate = CurrentValue.Date;
+        var baseDate = EffectiveValue.Date;
         DateTime? next = e.Key switch
         {
             "ArrowLeft" => baseDate.AddDays(-1),
@@ -225,15 +224,32 @@
 
         if (next is not null)
         {
-            CurrentValue = next.Value.Date;
-            textValue = Format(CurrentValue);
-            cursorMonth = new DateTime(CurrentValue.Year, CurrentValue.Month, 1);
+            var nextDate = next.Value.Date;
+            await SetDateAsync(nextDate);
+            textValue = Format(nextDate);
+            cursorMonth = new DateTime(nextDate.Year, nextDate.Month, 1);
         }
+    }
+
+    private async Task SetDateAsync(DateTime? date)
+    {
+        if (IsNullableMode)
+        {
+            NullableValue = date?.Date;
+            await NullableValueChanged.InvokeAsync(NullableValue);
+            return;
+        }
+
+        if (date is null)
+            return;
+
+        Value = date.Value.Date;
+        await ValueChanged.InvokeAsync(Value);
     }
 
     private string GetDayClass(DateTime date)
     {
-        var isSelected = date.Date == CurrentValue.Date;
+        var isSelected = SelectedValue.HasValue && date.Date == SelectedValue.Value;
         var isToday = date.Date == DateTime.Today;
 
         var baseClass = "h-9 w-full rounded-lg text-sm font-medium transition duration-150 focus:outline-none focus-visible:ring-4 focus-visible:ring-slate-200/70 dark:focus-visible:ring-slate-700/80";
@@ -244,30 +260,8 @@
         return string.Join(' ', new[] { baseClass, isSelected ? selected : normal, !isSelected && isToday ? today : "" }.Where(s => !string.IsNullOrWhiteSpace(s)));
     }
 
-    protected override bool TryParseValueFromString(string? value, out DateTime result, out string validationErrorMessage)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            result = default;
-            validationErrorMessage = "";
-            return true;
-        }
-
-        if (TryParseDate(value, out var dt))
-        {
-            result = dt.Date;
-            validationErrorMessage = "";
-            return true;
-        }
-
-        result = default;
-        validationErrorMessage = "Invalid date.";
-        return false;
-    }
-
     private static bool TryParseDate(string value, out DateTime dt)
     {
-        // Prefer current culture, but accept ISO-like inputs too.
         var styles = DateTimeStyles.AllowWhiteSpaces;
         return DateTime.TryParse(value, CultureInfo.CurrentCulture, styles, out dt)
             || DateTime.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, styles, out dt)

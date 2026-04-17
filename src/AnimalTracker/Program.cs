@@ -71,15 +71,25 @@ builder.Services.AddDataProtection()
     .SetApplicationName("AnimalTracker");
 
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddHttpClient(nameof(SpeciesCatalogSyncService), client =>
+{
+    client.BaseAddress = new Uri("https://api.inaturalist.org/");
+    client.Timeout = TimeSpan.FromSeconds(15);
+});
 builder.Services.AddScoped<CurrentUserService>();
+builder.Services.AddScoped<LoginAuditService>();
 builder.Services.AddScoped<LocationService>();
 builder.Services.AddScoped<SpeciesService>();
+builder.Services.AddScoped<SpeciesLookupService>();
+builder.Services.AddScoped<SpeciesCatalogSyncService>();
 builder.Services.AddScoped<AnimalService>();
 builder.Services.AddScoped<SightingService>();
+builder.Services.AddScoped<TerritoryInsightsService>();
 builder.Services.AddScoped<PhotoStorageService>();
 builder.Services.AddScoped<TimelineFilterState>();
 builder.Services.AddScoped<UserSettingsService>();
 builder.Services.AddScoped<UserPreferencesState>();
+builder.Services.AddScoped<UiProgressState>();
 builder.Services.AddScoped<AdminUserService>();
 builder.Services.AddScoped<AppSettingsService>();
 
@@ -106,18 +116,8 @@ using (var scope = app.Services.CreateScope())
     var adminUsers = scope.ServiceProvider.GetRequiredService<AdminUserService>();
     await adminUsers.EnsureAdminRoleAsync();
     await EnsureAdminUserAsync(scope.ServiceProvider);
-
-    if (!await db.Species.AsNoTracking().AnyAsync())
-    {
-        db.Species.AddRange(
-            new AnimalTracker.Data.Entities.Species { Name = "Squirrel" },
-            new AnimalTracker.Data.Entities.Species { Name = "Fox" },
-            new AnimalTracker.Data.Entities.Species { Name = "Bird" },
-            new AnimalTracker.Data.Entities.Species { Name = "Cat" },
-            new AnimalTracker.Data.Entities.Species { Name = "Rabbit" }
-        );
-        await db.SaveChangesAsync();
-    }
+    var catalogSync = scope.ServiceProvider.GetRequiredService<SpeciesCatalogSyncService>();
+    await catalogSync.SyncActiveRegionAsync(forceRefresh: false);
 }
 
 // Configure the HTTP request pipeline.
@@ -410,6 +410,14 @@ static async Task EnsureAdminUserAsync(IServiceProvider sp)
         if (!result.Succeeded)
             throw new InvalidOperationException(string.Join("; ", result.Errors.Select(e => e.Description)));
         existing = created;
+    }
+    else if (!existing.EmailConfirmed)
+    {
+        // Keep configured admin usable without email confirmation blockers.
+        existing.EmailConfirmed = true;
+        var result = await userManager.UpdateAsync(existing);
+        if (!result.Succeeded)
+            throw new InvalidOperationException(string.Join("; ", result.Errors.Select(e => e.Description)));
     }
 
     if (!await userManager.IsInRoleAsync(existing, AdminUserService.AdminRoleName))

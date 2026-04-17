@@ -8,7 +8,9 @@
 @using AnimalTracker.Services
 @using Microsoft.AspNetCore.Components.Forms
 @inject UserSettingsService Settings
+@inject AppSettingsService AppSettings
 @inject AnimalTracker.State.UserPreferencesState Prefs
+@inject AnimalTracker.State.UiProgressState UiProgress
 @inject IJSRuntime JS
 
 <PageTitle>Settings</PageTitle>
@@ -163,42 +165,52 @@
 </UICard>
 
 <UICard Title="Species catalog" Class="mt-8">
-    <p class="text-sm leading-relaxed text-slate-600 dark:text-slate-300">Species are shared app-wide. You can remove one only when no animals or sightings reference it.</p>
+    <p class="text-sm leading-relaxed text-slate-600 dark:text-slate-300">Choose your region first, then sync species for that region. Cached regions are reused until you re-sync.</p>
+    <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">Taxa scope: Animals only.</p>
 
-    <div class="mt-6 grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
-        <UIField Label="New species name" For="newSpecies">
-            <input id="newSpecies" type="text" class="w-full px-3 py-2.5" @bind="newSpeciesName" />
-        </UIField>
-        <UIButton Variant="UiButtonVariant.Primary" Class="w-full shrink-0 sm:w-auto" @onclick="CreateSpeciesAsync">Add species</UIButton>
-    </div>
+    <div class="mt-6 space-y-4">
+        <div class="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
+            <UIField Label="Search region" For="regionQuery">
+                <input id="regionQuery"
+                       class="w-full min-w-0 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80"
+                       placeholder="e.g. Glasgow, Scotland, UK"
+                       @bind="regionQuery"
+                       @bind:event="oninput" />
+            </UIField>
+            <UIButton Variant="UiButtonVariant.Outline" Class="w-full sm:w-auto" @onclick="SearchRegionsAsync">Find regions</UIButton>
+        </div>
 
-    <div class="mt-8">
-        @if (speciesLoading)
+        @if (regionResults.Count > 0)
         {
-            <p class="text-sm text-slate-600 dark:text-slate-400">Loading…</p>
+            <div class="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
+                <UIField Label="Matching regions" For="regionSelect">
+                    <select id="regionSelect" class="w-full px-3 py-2.5" @bind="selectedRegionKey">
+                        @foreach (var region in regionResults)
+                        {
+                            <option value="@region.RegionKey">@region.RegionName</option>
+                        }
+                    </select>
+                </UIField>
+                <UIButton Variant="UiButtonVariant.Primary" Class="w-full sm:w-auto" @onclick="SelectRegionAsync">Use region</UIButton>
+            </div>
         }
-        else if (speciesRows.Count == 0)
+
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div class="text-xs text-slate-500 dark:text-slate-400">
+                Active region: @(string.IsNullOrWhiteSpace(activeSpeciesRegionName) ? "Not selected" : activeSpeciesRegionName)
+            </div>
+            <UIButton Variant="UiButtonVariant.Primary" Class="w-full shrink-0 sm:w-auto" Disabled="@(!hasActiveSpeciesRegion)" @onclick="SyncSpeciesCatalogAsync">Sync selected region</UIButton>
+            <UIButton Variant="UiButtonVariant.Outline" Class="w-full shrink-0 sm:w-auto" Disabled="@(!hasActiveSpeciesRegion)" @onclick="ResyncSpeciesCatalogAsync">Re-sync selected region</UIButton>
+        </div>
+
+        @if (!hasActiveSpeciesRegion)
         {
-            <p class="text-sm text-slate-700 dark:text-slate-200">No species.</p>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Species lists stay empty until a region is selected.</p>
         }
-        else
-        {
-            <ul class="divide-y divide-slate-200/80 overflow-hidden rounded-xl border border-slate-200/80 dark:divide-slate-800/80 dark:border-slate-800/80">
-                @foreach (var row in speciesRows)
-                {
-                    var canDelete = row.AnimalCount == 0 && row.SightingCount == 0;
-                    <li class="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div class="min-w-0">
-                            <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">@row.Name</div>
-                            <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">Animals: @row.AnimalCount · Sightings: @row.SightingCount</div>
-                        </div>
-                        <UIButton Variant="UiButtonVariant.Danger" Size="UiButtonSize.Sm" Disabled="@(!canDelete)" Class="w-full shrink-0 sm:w-auto"
-                                  title="@(canDelete ? "" : "Still in use by animals or sightings.")"
-                                  @onclick="() => DeleteSpeciesAsync(row.Id)">Delete</UIButton>
-                    </li>
-                }
-            </ul>
-        }
+
+        <div class="pt-1">
+            <UIButton Href="/species" Variant="UiButtonVariant.Outline" Size="UiButtonSize.Sm">Open species lookup</UIButton>
+        </div>
     </div>
 </UICard>
 
@@ -209,14 +221,17 @@
     private readonly Model model = new();
 
     [Inject] private LocationService LocationService { get; set; } = default!;
-    [Inject] private SpeciesService SpeciesService { get; set; } = default!;
+    [Inject] private SpeciesCatalogSyncService SpeciesCatalogSyncService { get; set; } = default!;
 
     private bool locationsLoading = true;
-    private bool speciesLoading = true;
     private List<AnimalTracker.Data.Entities.Location> locations = [];
-    private List<SpeciesUsageRow> speciesRows = [];
     private string newLocationName = "";
-    private string newSpeciesName = "";
+    private string regionQuery = "";
+    private List<SpeciesRegionOption> regionResults = [];
+    private string? selectedRegionKey;
+    private string? selectedRegionName;
+    private bool hasActiveSpeciesRegion;
+    private string? activeSpeciesRegionName;
 
     private bool hasBackground;
     private CancellationTokenSource? preferencesSaveCts;
@@ -238,8 +253,8 @@
     protected override async Task OnInitializedAsync()
     {
         await ReloadSettingsModelAsync();
+        await ReloadAppSettingsModelAsync();
         await ReloadLocationsAsync();
-        await ReloadSpeciesAsync();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -274,11 +289,13 @@
         locationsLoading = false;
     }
 
-    private async Task ReloadSpeciesAsync()
+    private async Task ReloadAppSettingsModelAsync()
     {
-        speciesLoading = true;
-        speciesRows = await SpeciesService.ListWithUsageAsync();
-        speciesLoading = false;
+        var app = await AppSettings.GetOrCreateAsync();
+        selectedRegionKey = app.ActiveSpeciesRegionKey;
+        selectedRegionName = app.ActiveSpeciesRegionName;
+        activeSpeciesRegionName = app.ActiveSpeciesRegionName;
+        hasActiveSpeciesRegion = !string.IsNullOrWhiteSpace(app.ActiveSpeciesRegionKey);
     }
 
     private async Task OnThemeModeChangedAsync(ChangeEventArgs e)
@@ -477,18 +494,22 @@
         }
     }
 
-    private async Task CreateSpeciesAsync()
+    private async Task SyncSpeciesCatalogAsync()
     {
         message = null;
+        using var progress = UiProgress.Begin("Syncing species catalog");
         try
         {
-            if (string.IsNullOrWhiteSpace(newSpeciesName))
+            var result = await SpeciesCatalogSyncService.SyncActiveRegionAsync(forceRefresh: false);
+            if (result is null)
+            {
+                message = "Select a region first.";
                 return;
+            }
 
-            await SpeciesService.CreateAsync(newSpeciesName, description: null);
-            newSpeciesName = "";
-            await ReloadSpeciesAsync();
-            message = "Species added.";
+            message = result.UsedCache
+                ? $"Using cached species for {result.RegionName}. Click re-sync to refresh."
+                : $"Species synced for {result.RegionName} ({result.UpdatedCount} updates).";
         }
         catch (Exception ex)
         {
@@ -496,19 +517,63 @@
         }
     }
 
-    private async Task DeleteSpeciesAsync(int id)
+    private async Task ResyncSpeciesCatalogAsync()
     {
         message = null;
+        using var progress = UiProgress.Begin("Re-syncing species catalog");
         try
         {
-            await SpeciesService.DeleteAsync(id);
-            await ReloadSpeciesAsync();
-            message = "Species deleted.";
+            var result = await SpeciesCatalogSyncService.SyncActiveRegionAsync(forceRefresh: true);
+            if (result is null)
+            {
+                message = "Select a region first.";
+                return;
+            }
+
+            message = $"Region re-synced for {result.RegionName} ({result.UpdatedCount} updates).";
         }
         catch (Exception ex)
         {
             message = $"Error: {ex.Message}";
         }
+    }
+
+    private async Task SearchRegionsAsync()
+    {
+        message = null;
+        using var progress = UiProgress.Begin("Searching regions");
+        regionResults = await SpeciesCatalogSyncService.SearchRegionsAsync(regionQuery);
+        if (regionResults.Count == 0)
+        {
+            selectedRegionKey = null;
+            selectedRegionName = null;
+            message = "No matching regions found.";
+            return;
+        }
+
+        selectedRegionKey = regionResults[0].RegionKey;
+        selectedRegionName = regionResults[0].RegionName;
+    }
+
+    private async Task SelectRegionAsync()
+    {
+        if (string.IsNullOrWhiteSpace(selectedRegionKey))
+        {
+            message = "Pick a region first.";
+            return;
+        }
+
+        var region = regionResults.FirstOrDefault(x => x.RegionKey == selectedRegionKey);
+        if (region is null)
+        {
+            message = "Selected region is no longer in the result list. Search again.";
+            return;
+        }
+
+        using var progress = UiProgress.Begin("Applying region");
+        await AppSettings.UpdateActiveSpeciesRegionAsync(region.RegionKey, region.RegionName);
+        await ReloadAppSettingsModelAsync();
+        message = $"Active species region set to {region.RegionName}.";
     }
 
     private sealed class Model

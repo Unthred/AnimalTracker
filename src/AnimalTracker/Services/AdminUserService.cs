@@ -13,7 +13,9 @@ public sealed record AdminUserRow(
     string Email,
     bool EmailConfirmed,
     bool IsAdmin,
-    bool IsLockedOut);
+    bool IsLockedOut,
+    DateTime? LastLoginAtUtc,
+    string? LastLoginIpAddress);
 
 public sealed class AdminUserService(
     UserManager<ApplicationUser> userManager,
@@ -78,7 +80,9 @@ public sealed class AdminUserService(
                 u.Id,
                 u.Email,
                 u.EmailConfirmed,
-                u.LockoutEnd
+                u.LockoutEnd,
+                u.LastLoginAtUtc,
+                u.LastLoginIpAddress
             })
             .ToListAsync(cancellationToken);
 
@@ -93,7 +97,9 @@ public sealed class AdminUserService(
                 Email: u.Email ?? "(no email)",
                 EmailConfirmed: u.EmailConfirmed,
                 IsAdmin: isAdmin,
-                IsLockedOut: u.LockoutEnd.HasValue && u.LockoutEnd.Value > DateTimeOffset.UtcNow));
+                IsLockedOut: u.LockoutEnd.HasValue && u.LockoutEnd.Value > DateTimeOffset.UtcNow,
+                LastLoginAtUtc: u.LastLoginAtUtc,
+                LastLoginIpAddress: u.LastLoginIpAddress));
         }
 
         return list;

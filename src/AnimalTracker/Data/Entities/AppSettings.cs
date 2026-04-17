@@ -12,6 +12,12 @@ public sealed class AppSettings
     [MaxLength(512)]
     public string? DefaultAuthImageRelativePath { get; set; }
 
+    [MaxLength(100)]
+    public string? ActiveSpeciesRegionKey { get; set; }
+
+    [MaxLength(200)]
+    public string? ActiveSpeciesRegionName { get; set; }
+
     public DateTime CreatedAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
 }
