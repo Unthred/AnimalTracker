@@ -4,121 +4,489 @@
 @inject NavigationManager NavigationManager
 @inject AnimalTracker.Services.AdminUserService AdminUsers
 
-<div class="border-b border-slate-300/90 bg-transparent px-5 py-5 dark:border-slate-700/90">
-    <a class="text-lg font-bold tracking-tight accent-text transition duration-200 hover:opacity-90" href="">AnimalTracker</a>
-    <p class="mt-1 text-xs leading-relaxed text-slate-800 dark:text-slate-400">Sightings &amp; wildlife log</p>
+<div class="nav-variant nav-variant--desktop">
+    <div class="border-b border-slate-300/90 bg-transparent px-5 py-5 dark:border-slate-700/90">
+        <a class="text-lg font-bold tracking-tight accent-text transition duration-200 hover:opacity-90" href="">AnimalTracker</a>
+        <p class="mt-1 text-xs leading-relaxed text-slate-800 dark:text-slate-400">Sightings &amp; wildlife log</p>
+    </div>
+
+    <div class="px-3 py-4">
+        <nav class="flex flex-col gap-1">
+            <NavLink class="app-nav-link"
+                     href="" Match="NavLinkMatch.All">
+                Timeline
+            </NavLink>
+
+            <NavLink class="app-nav-link"
+                     href="sightings/new">
+                Add sighting
+            </NavLink>
+
+            <NavLink class="app-nav-link"
+                     href="sightings/import">
+                Import photos
+            </NavLink>
+
+            <NavLink class="app-nav-link"
+                     href="animals">
+                Animals
+            </NavLink>
+
+            <NavLink class="app-nav-link"
+                     href="species">
+                Species lookup
+            </NavLink>
+
+            <NavLink class="app-nav-link"
+                     href="stats">
+                Stats
+            </NavLink>
+
+            <NavLink class="app-nav-link"
+                     href="map">
+                Map
+            </NavLink>
+
+            <NavLink class="app-nav-link"
+                     href="settings">
+                Settings
+            </NavLink>
+
+            <AuthorizeView>
+                <Authorized Context="auth">
+                    <div class="mt-4 border-t border-slate-300/90 pt-4 dark:border-slate-700/90">
+                        <button type="button"
+                                class="app-nav-link flex w-full items-center justify-between text-left"
+                                aria-expanded="@(ShowAccountMenu ? "true" : "false")"
+                                @onclick="ToggleAccountMenu">
+                            <span class="min-w-0 truncate">@auth.User.Identity?.Name</span>
+                            <span class="ml-2 text-xs text-slate-400 dark:text-slate-500">@(ShowAccountMenu ? "▾" : "▸")</span>
+                        </button>
+
+                        @if (ShowAccountMenu)
+                        {
+                            <div class="mt-1 ml-2 flex flex-col gap-1">
+                                <NavLink class="app-nav-sublink"
+                                         href="Account/Manage" Match="NavLinkMatch.All">
+                                    Profile
+                                </NavLink>
+                                <NavLink class="app-nav-sublink"
+                                         href="Account/Manage/Email">
+                                    Email
+                                </NavLink>
+                                <NavLink class="app-nav-sublink"
+                                         href="Account/Manage/ChangePassword">
+                                    Password
+                                </NavLink>
+                                <NavLink class="app-nav-sublink"
+                                         href="Account/Manage/TwoFactorAuthentication">
+                                    Two-factor authentication
+                                </NavLink>
+                                <NavLink class="app-nav-sublink"
+                                         href="Account/Manage/Passkeys">
+                                    Passkeys
+                                </NavLink>
+                                <NavLink class="app-nav-sublink"
+                                         href="Account/Manage/PersonalData">
+                                    Personal data
+                                </NavLink>
+                                @if (isCurrentUserAdmin)
+                                {
+                                    <NavLink class="app-nav-sublink"
+                                             href="admin">
+                                        Admin
+                                    </NavLink>
+                                }
+                            </div>
+                        }
+
+                        <form action="Account/Logout" method="post">
+                            <AntiforgeryToken />
+                            <input type="hidden" name="ReturnUrl" value="@currentUrl" />
+                            <button type="submit" class="app-nav-link w-full text-left">Log out</button>
+                        </form>
+                    </div>
+                </Authorized>
+                <NotAuthorized>
+                    <div class="mt-4 border-t border-slate-300/90 pt-4 dark:border-slate-700/90">
+                        <NavLink class="app-nav-link" href="Account/Register">
+                            Register
+                        </NavLink>
+                        <NavLink class="app-nav-link" href="Account/Login">
+                            Login
+                        </NavLink>
+                    </div>
+                </NotAuthorized>
+            </AuthorizeView>
+        </nav>
+    </div>
 </div>
 
-<div class="px-3 py-4">
-    <nav class="flex flex-col gap-1">
-        <NavLink class="app-nav-link"
-                 href="" Match="NavLinkMatch.All">
-            Timeline
-        </NavLink>
+<div class="nav-variant nav-variant--tablet">
+    <div class="tablet-nav-shell">
+        <a class="tablet-nav-brand" href="" aria-label="AnimalTracker home">
+            <span class="tablet-nav-brand__mark">AT</span>
+            <span class="tablet-nav-brand__label">AnimalTracker</span>
+        </a>
 
-        <NavLink class="app-nav-link"
-                 href="sightings/new">
-            Add sighting
-        </NavLink>
+        <nav class="tablet-nav-list" aria-label="Tablet navigation">
+            <NavLink class="tablet-nav-link"
+                     href=""
+                     Match="NavLinkMatch.All">
+                <span class="tablet-nav-link__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M4 10.5 12 4l8 6.5" />
+                        <path d="M6.75 9.75V20h10.5V9.75" />
+                    </svg>
+                </span>
+                <span class="tablet-nav-link__label">Timeline</span>
+            </NavLink>
 
-        <NavLink class="app-nav-link"
-                 href="sightings/import">
-            Import photos
-        </NavLink>
+            <NavLink class="tablet-nav-link"
+                     href="map">
+                <span class="tablet-nav-link__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M9 18 3.75 20V6L9 4l6 2 5.25-2v14L15 20l-6-2Z" />
+                        <path d="M9 4v14" />
+                        <path d="M15 6v14" />
+                    </svg>
+                </span>
+                <span class="tablet-nav-link__label">Map</span>
+            </NavLink>
 
-        <NavLink class="app-nav-link"
-                 href="animals">
-            Animals
-        </NavLink>
+            <NavLink class="tablet-nav-link tablet-nav-link--primary"
+                     href="sightings/new">
+                <span class="tablet-nav-link__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M12 5v14" />
+                        <path d="M5 12h14" />
+                    </svg>
+                </span>
+                <span class="tablet-nav-link__label">Add</span>
+            </NavLink>
 
-        <NavLink class="app-nav-link"
-                 href="species">
-            Species lookup
-        </NavLink>
+            <NavLink class="tablet-nav-link"
+                     href="animals">
+                <span class="tablet-nav-link__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M7.5 11.25c1.2 0 2.25-.98 2.25-2.25S8.7 6.75 7.5 6.75 5.25 7.73 5.25 9s1.05 2.25 2.25 2.25Z" />
+                        <path d="M16.5 11.25c1.2 0 2.25-.98 2.25-2.25s-1.05-2.25-2.25-2.25S14.25 7.73 14.25 9s1.05 2.25 2.25 2.25Z" />
+                        <path d="M12 8.5c1.24 0 2.25-1.06 2.25-2.38S13.24 3.75 12 3.75 9.75 4.8 9.75 6.12 10.76 8.5 12 8.5Z" />
+                        <path d="M6.5 19.5c0-2.62 2.46-4.75 5.5-4.75s5.5 2.13 5.5 4.75c0 .41-.34.75-.75.75h-9.5a.75.75 0 0 1-.75-.75Z" />
+                    </svg>
+                </span>
+                <span class="tablet-nav-link__label">Animals</span>
+            </NavLink>
 
-        <NavLink class="app-nav-link"
-                 href="stats">
-            Stats
-        </NavLink>
+            <NavLink class="tablet-nav-link"
+                     href="stats">
+                <span class="tablet-nav-link__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M5 19.25h14" />
+                        <path d="M7.5 16V10.5" />
+                        <path d="M12 16V6.75" />
+                        <path d="M16.5 16v-4.5" />
+                    </svg>
+                </span>
+                <span class="tablet-nav-link__label">Stats</span>
+            </NavLink>
 
-        <NavLink class="app-nav-link"
-                 href="map">
-            Map
-        </NavLink>
+            <NavLink class="tablet-nav-link"
+                     href="sightings/import">
+                <span class="tablet-nav-link__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M12 15.5V5" />
+                        <path d="m8.25 8.75 3.75-3.75 3.75 3.75" />
+                        <path d="M5 15.5v2.25A1.25 1.25 0 0 0 6.25 19h11.5A1.25 1.25 0 0 0 19 17.75V15.5" />
+                    </svg>
+                </span>
+                <span class="tablet-nav-link__label">Import</span>
+            </NavLink>
 
-        <NavLink class="app-nav-link"
-                 href="settings">
-            Settings
-        </NavLink>
+            <NavLink class="tablet-nav-link"
+                     href="species">
+                <span class="tablet-nav-link__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M6 18c6-1 9.5-4.5 12-12-7.5 2.5-11 6-12 12Z" />
+                        <path d="M8.5 15.5 15 9" />
+                    </svg>
+                </span>
+                <span class="tablet-nav-link__label">Species</span>
+            </NavLink>
 
-        <!-- User settings merged into Settings -->
+            <NavLink class="tablet-nav-link"
+                     href="settings">
+                <span class="tablet-nav-link__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M12 8.75a3.25 3.25 0 1 0 0 6.5 3.25 3.25 0 0 0 0-6.5Z" />
+                        <path d="M4.75 13.25v-2.5l2.06-.48c.18-.57.41-1.11.7-1.61l-1.16-1.77 1.77-1.77 1.77 1.16c.5-.29 1.04-.52 1.61-.7L12 3.5l2.5.08.48 2.06c.57.18 1.11.41 1.61.7l1.77-1.16 1.77 1.77-1.16 1.77c.29.5.52 1.04.7 1.61l2.06.48v2.5l-2.06.48c-.18.57-.41 1.11-.7 1.61l1.16 1.77-1.77 1.77-1.77-1.16c-.5.29-1.04.52-1.61.7L14.5 20.5H12l-.48-2.06c-.57-.18-1.11-.41-1.61-.7l-1.77 1.16-1.77-1.77 1.16-1.77a7.4 7.4 0 0 1-.7-1.61l-2.06-.48Z" />
+                    </svg>
+                </span>
+                <span class="tablet-nav-link__label">Settings</span>
+            </NavLink>
+        </nav>
 
         <AuthorizeView>
-            <Authorized Context="auth">
-                <div class="mt-4 border-t border-slate-300/90 pt-4 dark:border-slate-700/90">
-                    <button type="button"
-                            class="app-nav-link flex w-full items-center justify-between text-left"
-                            aria-expanded="@(ShowAccountMenu ? "true" : "false")"
-                            @onclick="ToggleAccountMenu">
-                        <span class="min-w-0 truncate">@auth.User.Identity?.Name</span>
-                        <span class="ml-2 text-xs text-slate-400 dark:text-slate-500">@(ShowAccountMenu ? "▾" : "▸")</span>
-                    </button>
+            <Authorized>
+                <div class="tablet-nav-account">
+                    <a class="tablet-nav-link @(IsOnAccountPage ? "active" : null)"
+                       href="Account/Manage">
+                        <span class="tablet-nav-link__icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M12 12.25a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" />
+                                <path d="M5 19.25c0-3.18 3.13-5.75 7-5.75s7 2.57 7 5.75" />
+                            </svg>
+                        </span>
+                        <span class="tablet-nav-link__label">Profile</span>
+                    </a>
 
-                    @if (ShowAccountMenu)
+                    @if (isCurrentUserAdmin)
                     {
-                        <div class="mt-1 ml-2 flex flex-col gap-1">
-                            <NavLink class="app-nav-sublink"
-                                     href="Account/Manage" Match="NavLinkMatch.All">
-                                Profile
-                            </NavLink>
-                            <NavLink class="app-nav-sublink"
-                                     href="Account/Manage/Email">
-                                Email
-                            </NavLink>
-                            <NavLink class="app-nav-sublink"
-                                     href="Account/Manage/ChangePassword">
-                                Password
-                            </NavLink>
-                            <NavLink class="app-nav-sublink"
-                                     href="Account/Manage/TwoFactorAuthentication">
-                                Two-factor authentication
-                            </NavLink>
-                            <NavLink class="app-nav-sublink"
-                                     href="Account/Manage/Passkeys">
-                                Passkeys
-                            </NavLink>
-                            <NavLink class="app-nav-sublink"
-                                     href="Account/Manage/PersonalData">
-                                Personal data
-                            </NavLink>
-                            @if (isCurrentUserAdmin)
-                            {
-                                <NavLink class="app-nav-sublink"
-                                         href="admin">
-                                    Admin
-                                </NavLink>
-                            }
-                        </div>
+                        <a class="tablet-nav-link @(IsRouteOrChild("admin") ? "active" : null)"
+                           href="admin">
+                            <span class="tablet-nav-link__icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M12 4.75 6.25 7.25v4.5c0 3.28 2.3 6.3 5.75 7.5 3.45-1.2 5.75-4.22 5.75-7.5v-4.5L12 4.75Z" />
+                                    <path d="M9.75 12h4.5" />
+                                    <path d="M12 9.75v4.5" />
+                                </svg>
+                            </span>
+                            <span class="tablet-nav-link__label">Admin</span>
+                        </a>
                     }
 
                     <form action="Account/Logout" method="post">
                         <AntiforgeryToken />
                         <input type="hidden" name="ReturnUrl" value="@currentUrl" />
-                        <button type="submit" class="app-nav-link w-full text-left">Log out</button>
+                        <button type="submit" class="tablet-nav-link tablet-nav-link--button">
+                            <span class="tablet-nav-link__icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M9.75 6.75H6.5A1.5 1.5 0 0 0 5 8.25v7.5a1.5 1.5 0 0 0 1.5 1.5h3.25" />
+                                    <path d="M14 16.5 18.5 12 14 7.5" />
+                                    <path d="M18.5 12H9.75" />
+                                </svg>
+                            </span>
+                            <span class="tablet-nav-link__label">Log out</span>
+                        </button>
                     </form>
                 </div>
             </Authorized>
             <NotAuthorized>
-                <div class="mt-4 border-t border-slate-300/90 pt-4 dark:border-slate-700/90">
-                    <NavLink class="app-nav-link" href="Account/Register">
-                        Register
+                <div class="tablet-nav-account">
+                    <NavLink class="tablet-nav-link" href="Account/Login">
+                        <span class="tablet-nav-link__icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M9.75 6.75H6.5A1.5 1.5 0 0 0 5 8.25v7.5a1.5 1.5 0 0 0 1.5 1.5h3.25" />
+                                <path d="M14 16.5 18.5 12 14 7.5" />
+                                <path d="M18.5 12H9.75" />
+                            </svg>
+                        </span>
+                        <span class="tablet-nav-link__label">Login</span>
                     </NavLink>
-                    <NavLink class="app-nav-link" href="Account/Login">
-                        Login
+                    <NavLink class="tablet-nav-link" href="Account/Register">
+                        <span class="tablet-nav-link__icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M12 12.25a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" />
+                                <path d="M5 19.25c0-3.18 3.13-5.75 7-5.75s7 2.57 7 5.75" />
+                                <path d="M18 7v4" />
+                                <path d="M16 9h4" />
+                            </svg>
+                        </span>
+                        <span class="tablet-nav-link__label">Register</span>
                     </NavLink>
                 </div>
             </NotAuthorized>
         </AuthorizeView>
+    </div>
+</div>
+
+<div class="nav-variant nav-variant--mobile">
+    @if (mobileMoreOpen)
+    {
+        <button type="button"
+                class="mobile-more-backdrop"
+                aria-label="Close more menu"
+                @onclick="CloseMobileMore"></button>
+
+        <section id="mobile-more-sheet"
+                 class="mobile-more-sheet"
+                 role="dialog"
+                 aria-modal="true"
+                 aria-label="More navigation">
+            <div class="mobile-more-sheet__header">
+                <p class="mobile-more-sheet__eyebrow">More</p>
+                <button type="button"
+                        class="mobile-more-sheet__close"
+                        aria-label="Close more menu"
+                        @onclick="CloseMobileMore">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M6 6l12 12M18 6L6 18" />
+                    </svg>
+                </button>
+            </div>
+
+            <div class="mobile-more-sheet__content">
+                <section class="mobile-more-group">
+                    <p class="mobile-more-group__label">Explore</p>
+                    <div class="mobile-more-group__items">
+                        <NavLink class="mobile-more-link" href="stats" @onclick="CloseMobileMore">
+                            Stats
+                        </NavLink>
+                        <NavLink class="mobile-more-link" href="sightings/import" @onclick="CloseMobileMore">
+                            Import photos
+                        </NavLink>
+                        <NavLink class="mobile-more-link" href="species" @onclick="CloseMobileMore">
+                            Species lookup
+                        </NavLink>
+                    </div>
+                </section>
+
+                <section class="mobile-more-group">
+                    <p class="mobile-more-group__label">System</p>
+                    <div class="mobile-more-group__items">
+                        <NavLink class="mobile-more-link" href="settings" @onclick="CloseMobileMore">
+                            Settings
+                        </NavLink>
+                    </div>
+                </section>
+
+                <AuthorizeView>
+                    <Authorized Context="auth">
+                        <section class="mobile-more-group">
+                            <p class="mobile-more-group__label">Account</p>
+                            <p class="mobile-more-group__meta">@auth.User.Identity?.Name</p>
+                            <div class="mobile-more-group__items">
+                                <NavLink class="mobile-more-link" href="Account/Manage" Match="NavLinkMatch.All" @onclick="CloseMobileMore">
+                                    Profile
+                                </NavLink>
+                                <NavLink class="mobile-more-link" href="Account/Manage/Email" @onclick="CloseMobileMore">
+                                    Email
+                                </NavLink>
+                                <NavLink class="mobile-more-link" href="Account/Manage/PersonalData" @onclick="CloseMobileMore">
+                                    Personal data
+                                </NavLink>
+                            </div>
+                        </section>
+
+                        <section class="mobile-more-group">
+                            <p class="mobile-more-group__label">Security</p>
+                            <div class="mobile-more-group__items">
+                                <NavLink class="mobile-more-link" href="Account/Manage/ChangePassword" @onclick="CloseMobileMore">
+                                    Password
+                                </NavLink>
+                                <NavLink class="mobile-more-link" href="Account/Manage/TwoFactorAuthentication" @onclick="CloseMobileMore">
+                                    Two-factor authentication
+                                </NavLink>
+                                <NavLink class="mobile-more-link" href="Account/Manage/Passkeys" @onclick="CloseMobileMore">
+                                    Passkeys
+                                </NavLink>
+                            </div>
+                        </section>
+
+                        @if (isCurrentUserAdmin)
+                        {
+                            <section class="mobile-more-group">
+                                <p class="mobile-more-group__label">Administration</p>
+                                <div class="mobile-more-group__items">
+                                    <NavLink class="mobile-more-link" href="admin" @onclick="CloseMobileMore">
+                                        Admin
+                                    </NavLink>
+                                </div>
+                            </section>
+                        }
+
+                        <form action="Account/Logout" method="post" class="mobile-more-logout">
+                            <AntiforgeryToken />
+                            <input type="hidden" name="ReturnUrl" value="@currentUrl" />
+                            <button type="submit" class="mobile-more-link mobile-more-link--danger">Log out</button>
+                        </form>
+                    </Authorized>
+                    <NotAuthorized>
+                        <section class="mobile-more-group">
+                            <p class="mobile-more-group__label">Account</p>
+                            <div class="mobile-more-group__items">
+                                <NavLink class="mobile-more-link" href="Account/Register" @onclick="CloseMobileMore">
+                                    Register
+                                </NavLink>
+                                <NavLink class="mobile-more-link" href="Account/Login" @onclick="CloseMobileMore">
+                                    Login
+                                </NavLink>
+                            </div>
+                        </section>
+                    </NotAuthorized>
+                </AuthorizeView>
+            </div>
+        </section>
+    }
+
+    <nav class="mobile-bottom-nav" aria-label="Primary mobile navigation">
+        <NavLink class="mobile-bottom-nav__link"
+                 href=""
+                 aria-label="Timeline"
+                 title="Timeline"
+                 Match="NavLinkMatch.All">
+            <span class="mobile-bottom-nav__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                    <path d="M4 10.5 12 4l8 6.5" />
+                    <path d="M6.75 9.75V20h10.5V9.75" />
+                </svg>
+            </span>
+        </NavLink>
+
+        <NavLink class="mobile-bottom-nav__link"
+                 href="map"
+                 aria-label="Map"
+                 title="Map">
+            <span class="mobile-bottom-nav__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                    <path d="M9 18 3.75 20V6L9 4l6 2 5.25-2v14L15 20l-6-2Z" />
+                    <path d="M9 4v14" />
+                    <path d="M15 6v14" />
+                </svg>
+            </span>
+        </NavLink>
+
+        <a class="mobile-bottom-nav__action @(IsRouteOrChild("sightings/new") ? "active" : null)"
+           href="sightings/new"
+           aria-label="Add sighting"
+           title="Add sighting">
+            <span class="mobile-bottom-nav__action-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                    <path d="M12 5v14" />
+                    <path d="M5 12h14" />
+                </svg>
+            </span>
+        </a>
+
+        <NavLink class="mobile-bottom-nav__link"
+                 href="animals"
+                 aria-label="Animals"
+                 title="Animals">
+            <span class="mobile-bottom-nav__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                    <path d="M7.5 11.25c1.2 0 2.25-.98 2.25-2.25S8.7 6.75 7.5 6.75 5.25 7.73 5.25 9s1.05 2.25 2.25 2.25Z" />
+                    <path d="M16.5 11.25c1.2 0 2.25-.98 2.25-2.25s-1.05-2.25-2.25-2.25S14.25 7.73 14.25 9s1.05 2.25 2.25 2.25Z" />
+                    <path d="M12 8.5c1.24 0 2.25-1.06 2.25-2.38S13.24 3.75 12 3.75 9.75 4.8 9.75 6.12 10.76 8.5 12 8.5Z" />
+                    <path d="M6.5 19.5c0-2.62 2.46-4.75 5.5-4.75s5.5 2.13 5.5 4.75c0 .41-.34.75-.75.75h-9.5a.75.75 0 0 1-.75-.75Z" />
+                </svg>
+            </span>
+        </NavLink>
+
+        <button type="button"
+                class="mobile-bottom-nav__link @((mobileMoreOpen || IsMobileMoreActive) ? "active" : null)"
+                aria-label="More"
+                title="More"
+                aria-expanded="@(mobileMoreOpen ? "true" : "false")"
+                aria-controls="mobile-more-sheet"
+                @onclick="ToggleMobileMore">
+            <span class="mobile-bottom-nav__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                    <path d="M5 7h14" />
+                    <path d="M5 12h14" />
+                    <path d="M5 17h14" />
+                </svg>
+            </span>
+        </button>
     </nav>
 </div>
 
@@ -126,6 +494,7 @@
     private string? currentUrl;
     private bool accountMenuExpanded;
     private bool isCurrentUserAdmin;
+    private bool mobileMoreOpen;
 
     protected override async Task OnInitializedAsync()
     {
@@ -139,6 +508,7 @@
         _ = InvokeAsync(async () =>
         {
             currentUrl = NavigationManager.ToBaseRelativePath(e.Location);
+            mobileMoreOpen = false;
             if (!IsOnAccountPage)
                 accountMenuExpanded = false;
             await RefreshAdminFlagAsync();
@@ -155,8 +525,34 @@
 
     private bool ShowAccountMenu => accountMenuExpanded || IsOnAccountPage;
 
+    private bool IsMobileMoreActive =>
+        IsRouteOrChild("stats") ||
+        IsRouteOrChild("sightings/import") ||
+        IsRouteOrChild("species") ||
+        IsRouteOrChild("settings") ||
+        IsRouteOrChild("Account/Manage") ||
+        IsRouteOrChild("admin");
+
     private void ToggleAccountMenu() =>
         accountMenuExpanded = !accountMenuExpanded;
+
+    private void ToggleMobileMore() =>
+        mobileMoreOpen = !mobileMoreOpen;
+
+    private void CloseMobileMore() =>
+        mobileMoreOpen = false;
+
+    private bool IsRouteOrChild(string route)
+    {
+        var current = NormalizeRoute(currentUrl);
+        var target = NormalizeRoute(route);
+
+        return current.Equals(target, StringComparison.OrdinalIgnoreCase)
+            || current.StartsWith($"{target}/", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizeRoute(string? route) =>
+        (route ?? string.Empty).Trim().Trim('/');
 
     private async Task RefreshAdminFlagAsync()
     {

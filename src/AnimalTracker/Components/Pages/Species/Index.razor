@@ -95,8 +95,8 @@
                 }
                 @if (!string.IsNullOrWhiteSpace(selected.ImageUrl))
                 {
-                    <div class="mb-4 overflow-hidden rounded-xl border border-slate-200/80 dark:border-slate-700/80">
-                        <img src="@selected.ImageUrl" alt="@selected.Name" class="h-56 w-full object-cover" decoding="async" loading="eager" />
+                    <div class="mb-4 overflow-hidden rounded-xl border border-slate-200/80 bg-slate-50/70 dark:border-slate-700/80 dark:bg-slate-800/30">
+                        <img src="@selected.ImageUrl" alt="@selected.Name" class="h-64 w-full object-contain lg:h-72" decoding="async" loading="eager" />
                     </div>
                 }
 

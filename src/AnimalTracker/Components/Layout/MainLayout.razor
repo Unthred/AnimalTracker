@@ -5,19 +5,23 @@
 <div class="relative min-h-dvh w-full overflow-x-hidden bg-transparent">
     <UiProgressBar />
 
-    <div class="mx-auto grid min-h-0 min-w-0 max-w-7xl grid-cols-1 gap-4 px-3 pb-20 pt-4 sm:gap-6 sm:px-4 sm:py-6 md:grid-cols-[minmax(0,17rem)_minmax(0,1fr)] lg:gap-8 lg:px-6 lg:py-8">
-        <aside class="app-surface h-fit min-w-0 overflow-hidden rounded-2xl border shadow-card dark:shadow-none md:sticky md:top-4 md:self-start">
+    <div class="app-layout-shell">
+        <aside class="app-layout-sidebar app-surface">
             <NavMenu />
         </aside>
 
         @* overflow-y visible so position:fixed popovers anchor to the viewport; overflow-x hidden keeps horizontal clip *@
-        <main class="app-surface min-h-[50vh] min-w-0 overflow-x-hidden overflow-y-visible rounded-2xl border shadow-card dark:shadow-none">
+        <main class="app-layout-main app-surface">
             <CascadingValue Name="CompactUi" Value="Prefs.CompactMode">
                 <div class="@MainInnerClass">
                     @Body
                 </div>
             </CascadingValue>
         </main>
+    </div>
+
+    <div class="app-layout-mobile-nav">
+        <NavMenu />
     </div>
 
     <MainLayoutFooter />
@@ -31,8 +35,8 @@
 
 @code {
     private string MainInnerClass => Prefs.CompactMode
-        ? "min-w-0 px-4 py-6 sm:px-5 sm:py-7 md:px-6 md:py-8"
-        : "min-w-0 px-4 py-7 sm:px-6 sm:py-8 md:px-8 md:py-10";
+        ? "min-w-0 px-4 py-6 sm:px-5 sm:py-7 md:px-5 md:py-7 lg:px-6 lg:py-8 xl:px-7 xl:py-9"
+        : "min-w-0 px-4 py-7 sm:px-6 sm:py-8 md:px-5 md:py-7 lg:px-8 lg:py-10";
 
     protected override void OnInitialized()
     {
