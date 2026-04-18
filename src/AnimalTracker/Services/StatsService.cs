@@ -10,6 +10,8 @@ public sealed record DailySightingCount(DateTime DayUtc, int Count);
 
 public sealed record BehaviorCountRow(SightingBehavior Behavior, int Count);
 
+public sealed record HourlySightingCount(int HourLocal, int Count);
+
 public sealed record SightingStatsSummary(
     int TotalSightings,
     int DistinctSpeciesCount,
@@ -19,7 +21,8 @@ public sealed record SightingStatsSummary(
     int HuntingSightings,
     IReadOnlyList<SpeciesCountRow> SpeciesCounts,
     IReadOnlyList<DailySightingCount> DailyCounts,
-    IReadOnlyList<BehaviorCountRow> BehaviorCounts);
+    IReadOnlyList<BehaviorCountRow> BehaviorCounts,
+    IReadOnlyList<HourlySightingCount> HourlyCounts);
 
 public sealed class StatsService(ApplicationDbContext db, CurrentUserService currentUser)
 {
@@ -76,6 +79,13 @@ public sealed class StatsService(ApplicationDbContext db, CurrentUserService cur
             .OrderBy(x => x.DayUtc)
             .ToList();
 
+        var hourlyCounts = occurredAtList
+            .GroupBy(t => t.ToLocalTime().Hour)
+            .ToDictionary(g => g.Key, g => g.Count());
+        var hourlyRows = Enumerable.Range(0, 24)
+            .Select(hour => new HourlySightingCount(hour, hourlyCounts.GetValueOrDefault(hour, 0)))
+            .ToList();
+
         // Behavior: SQLite/EF cannot translate GroupBy on nullable enum .Value (correlated Count fails).
         var behaviorValues = await baseQuery
             .Where(x => x.Behavior != null)
@@ -97,7 +107,8 @@ public sealed class StatsService(ApplicationDbContext db, CurrentUserService cur
             HuntingSightings: hunting,
             SpeciesCounts: speciesCounts,
             DailyCounts: dailyCounts,
-            BehaviorCounts: behaviorRows);
+            BehaviorCounts: behaviorRows,
+            HourlyCounts: hourlyRows);
     }
 
     private static IQueryable<Sighting> ApplyFilters(IQueryable<Sighting> query, SightingFilters filters)

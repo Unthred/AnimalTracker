@@ -2,7 +2,6 @@
 @rendermode InteractiveServer
 @implements IAsyncDisposable
 
-@using System.Globalization
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.JSInterop
 @attribute [Authorize]
@@ -15,7 +14,7 @@
 
 <PageTitle>Stats</PageTitle>
 
-<UIPageHeader Title="Stats" Description="Charts, mix breakdowns, and an activity heat map for your sightings.">
+<UIPageHeader Title="Stats" Description="Charts, mix breakdowns, and activity timing patterns for your sightings.">
     <Actions>
         <UIButton Href="/map" Variant="UiButtonVariant.Outline">Open map</UIButton>
     </Actions>
@@ -114,55 +113,12 @@ else
         }
     </div>
 
-    @if (summary.DailyCounts.Count > 0)
+    @if (summary.HourlyCounts.Any(x => x.Count > 0))
     {
-        <UICard Title="Sightings by day (UTC)" Class="mt-6">
-            <p class="mb-2 text-xs text-slate-600 dark:text-slate-400">Daily totals across the selected window.</p>
+        <UICard Title="Activity by time of day (local)" Class="mt-6">
+            <p class="mb-2 text-xs text-slate-600 dark:text-slate-400">Primary activity metric: local-hour distribution across sightings in the selected range.</p>
             <div class="relative h-72 w-full">
-                <canvas id="@IdDaily"></canvas>
-            </div>
-        </UICard>
-    }
-
-    @if (HeatmapRows.Count > 0)
-    {
-        <UICard Title="Activity heat map (UTC)" Class="mt-6">
-            <p class="mb-3 text-xs text-slate-600 dark:text-slate-400">Calendar grid: stronger cyan = more sightings that day. Weeks start on Monday.</p>
-            <div class="overflow-x-auto">
-                <div class="inline-block w-fit max-w-full">
-                    <div class="mb-0.5 grid grid-cols-7 gap-0.5 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                        <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
-                    </div>
-                    @foreach (var row in HeatmapRows)
-                    {
-                        <div class="mb-0.5 grid grid-cols-7 gap-0.5">
-                            @foreach (var cell in row)
-                            {
-                                @if (cell.IsPadding)
-                                {
-                                    <div class="size-3 shrink-0 rounded-sm bg-transparent dark:bg-transparent"></div>
-                                }
-                                else
-                                {
-                                    <div class="size-3 shrink-0 rounded-sm border border-slate-200/40 dark:border-slate-600/40"
-                                         style="@HeatmapCellStyle(cell)"
-                                         title="@HeatmapTitle(cell)"></div>
-                                }
-                            }
-                        </div>
-                    }
-                </div>
-            </div>
-            <div class="mt-3 flex flex-wrap items-center gap-3 text-[10px] text-slate-500 dark:text-slate-400">
-                <span>Less</span>
-                <div class="flex gap-0.5">
-                    @foreach (var step in new[] { 0.0, 0.25, 0.5, 0.75, 1.0 })
-                    {
-                        <div class="h-3 w-5 rounded-sm border border-slate-300/30 dark:border-slate-600/30"
-                             style="@($"background-color: rgb(6 182 212 / {(0.12 + 0.78 * step).ToString("0.##", CultureInfo.InvariantCulture)});")"></div>
-                    }
-                </div>
-                <span>More</span>
+                <canvas id="@IdHourly"></canvas>
             </div>
         </UICard>
     }
@@ -226,7 +182,7 @@ else
 @code {
     private readonly string _chartUid = Guid.NewGuid().ToString("n")[..8];
     private string IdSpecies => $"stats-sp-{_chartUid}";
-    private string IdDaily => $"stats-daily-{_chartUid}";
+    private string IdHourly => $"stats-hourly-{_chartUid}";
     private string IdBehavior => $"stats-beh-{_chartUid}";
 
     private bool loading = true;
@@ -234,40 +190,7 @@ else
     private DateTime? fromLocalDate;
     private DateTime? toLocalDate;
     private TerritoryDashboardData dashboard = new([], []);
-    private SightingStatsSummary summary = new(0, 0, 0, 0, 0, 0, [], [], []);
-
-    private int MaxDailyCount => summary.DailyCounts.Count == 0 ? 0 : summary.DailyCounts.Max(x => x.Count);
-
-    private IReadOnlyList<IReadOnlyList<HeatmapCell>> HeatmapRows
-    {
-        get
-        {
-            if (summary.DailyCounts.Count == 0)
-                return [];
-
-            var byDay = summary.DailyCounts.ToDictionary(d => DateOnly.FromDateTime(d.DayUtc), d => d.Count);
-            var minD = byDay.Keys.Min();
-            var maxD = byDay.Keys.Max();
-            var cells = new List<HeatmapCell>();
-            var pad = MondayOffset(minD);
-            for (var i = 0; i < pad; i++)
-                cells.Add(new HeatmapCell(IsPadding: true, Day: null, Count: 0));
-
-            for (var d = minD; d <= maxD; d = d.AddDays(1))
-                cells.Add(new HeatmapCell(IsPadding: false, Day: d, Count: byDay.GetValueOrDefault(d, 0)));
-
-            var rows = new List<IReadOnlyList<HeatmapCell>>();
-            for (var i = 0; i < cells.Count; i += 7)
-                rows.Add(cells.Skip(i).Take(7).ToList());
-
-            var last = rows[^1].ToList();
-            while (last.Count < 7)
-                last.Add(new HeatmapCell(IsPadding: true, Day: null, Count: 0));
-            rows[^1] = last;
-
-            return rows;
-        }
-    }
+    private SightingStatsSummary summary = new(0, 0, 0, 0, 0, 0, [], [], [], []);
 
     private string GeotaggedSubtitle =>
         summary.TotalSightings > 0
@@ -326,7 +249,7 @@ else
     {
         try
         {
-            foreach (var id in new[] { IdSpecies, IdDaily, IdBehavior })
+            foreach (var id in new[] { IdSpecies, IdHourly, IdBehavior })
                 await JS.InvokeVoidAsync("animalTrackerStatsChartsDestroy", id);
         }
         catch
@@ -348,13 +271,13 @@ else
                 summary.SpeciesCounts.Select(s => s.Count).ToArray());
         }
 
-        if (summary.DailyCounts.Count > 0)
+        if (summary.HourlyCounts.Any(x => x.Count > 0))
         {
             await JS.InvokeVoidAsync(
                 "animalTrackerStatsChartsBar",
-                IdDaily,
-                summary.DailyCounts.Select(d => d.DayUtc.ToString("MMM d", CultureInfo.InvariantCulture)).ToArray(),
-                summary.DailyCounts.Select(d => d.Count).ToArray(),
+                IdHourly,
+                summary.HourlyCounts.Select(d => $"{d.HourLocal:D2}:00").ToArray(),
+                summary.HourlyCounts.Select(d => d.Count).ToArray(),
                 "Sightings");
         }
 
@@ -371,26 +294,6 @@ else
     private static int PercentOf(int part, int whole) =>
         whole <= 0 ? 0 : (int)Math.Round(100.0 * part / whole);
 
-    private static int MondayOffset(DateOnly d)
-    {
-        var dow = (int)d.DayOfWeek;
-        return dow == 0 ? 6 : dow - 1;
-    }
-
-    private string HeatmapCellStyle(HeatmapCell cell)
-    {
-        var max = MaxDailyCount;
-        if (max <= 0)
-            return "background-color: rgb(51 65 85 / 0.15);";
-
-        var t = cell.Count <= 0 ? 0 : Math.Pow(Math.Clamp(cell.Count / (double)max, 0, 1), 0.55);
-        var a = 0.12 + 0.78 * t;
-        return $"background-color: rgb(6 182 212 / {a.ToString("0.##", CultureInfo.InvariantCulture)});";
-    }
-
-    private static string HeatmapTitle(HeatmapCell cell) =>
-        cell.Day is { } d ? $"{d:yyyy-MM-dd}: {cell.Count} sighting(s)" : "";
-
     private static string FormatCoordinates(double? lat, double? lng)
     {
         if (lat is null || lng is null)
@@ -398,6 +301,4 @@ else
 
         return $"{lat.Value:0.000}, {lng.Value:0.000}";
     }
-
-    private sealed record HeatmapCell(bool IsPadding, DateOnly? Day, int Count);
 }
