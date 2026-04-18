@@ -129,22 +129,22 @@ else
         <UICard Title="Activity heat map (UTC)" Class="mt-6">
             <p class="mb-3 text-xs text-slate-600 dark:text-slate-400">Calendar grid: stronger cyan = more sightings that day. Weeks start on Monday.</p>
             <div class="overflow-x-auto">
-                <div class="inline-block min-w-full">
-                    <div class="mb-1 grid grid-cols-7 gap-1 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                <div class="inline-block w-fit max-w-full">
+                    <div class="mb-0.5 grid grid-cols-7 gap-0.5 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                         <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
                     </div>
                     @foreach (var row in HeatmapRows)
                     {
-                        <div class="mb-1 grid grid-cols-7 gap-1">
+                        <div class="mb-0.5 grid grid-cols-7 gap-0.5">
                             @foreach (var cell in row)
                             {
                                 @if (cell.IsPadding)
                                 {
-                                    <div class="aspect-square min-h-[2rem] rounded-sm bg-transparent dark:bg-transparent"></div>
+                                    <div class="size-3 shrink-0 rounded-sm bg-transparent dark:bg-transparent"></div>
                                 }
                                 else
                                 {
-                                    <div class="aspect-square min-h-[2rem] rounded-sm border border-slate-200/40 dark:border-slate-600/40"
+                                    <div class="size-3 shrink-0 rounded-sm border border-slate-200/40 dark:border-slate-600/40"
                                          style="@HeatmapCellStyle(cell)"
                                          title="@HeatmapTitle(cell)"></div>
                                 }
