@@ -8,7 +8,6 @@ set -Eeuo pipefail
 #   bash ./unraid-update.sh main
 #
 # Optional env vars:
-#   NO_BUILD=1           Skip image rebuild and just restart.
 #   ALLOW_DIRTY=1        Allow running when repo has local changes.
 #   TAIL_LOG_LINES=80    How many log lines to show after startup.
 
@@ -55,13 +54,11 @@ fi
 echo "==> Pulling latest commits"
 git pull --ff-only origin "$BRANCH"
 
-if [ "${NO_BUILD:-0}" = "1" ]; then
-  echo "==> Restarting containers without rebuild"
-  docker compose up -d
-else
-  echo "==> Rebuilding and restarting containers"
-  docker compose up -d --build
-fi
+echo "==> Pulling latest image"
+docker compose pull animaltracker
+
+echo "==> Recreating app container (short downtime cutover)"
+docker compose up -d --no-deps --force-recreate animaltracker
 
 echo "==> Container status"
 docker compose ps

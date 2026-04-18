@@ -1,8 +1,6 @@
 services:
   animaltracker:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ${ANIMALTRACKER_IMAGE:-ghcr.io/unthred/animaltracker:main}
     container_name: animaltracker
     restart: unless-stopped
     env_file:

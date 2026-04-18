@@ -23,7 +23,7 @@ dotnet run --project .\src\AnimalTracker\AnimalTracker.csproj
 
 ## Deploy (UnRaid + OPNsense HAProxy)
 
-### Build on UnRaid (no Docker required on this PC)
+### Deploy on UnRaid (pull prebuilt image)
 1. Copy or clone this repo onto UnRaid (for example under `/mnt/user/appdata/animaltracker-src`).
 2. In the repo root, create your environment file:
 
@@ -33,6 +33,7 @@ cp .env.example .env
 
 3. Edit `.env` and set:
 - `APP_PORT` (default `8085`)
+- `ANIMALTRACKER_IMAGE` (default `ghcr.io/unthred/animaltracker:main`)
 - `DATA_ROOT` (default `./data`, or absolute `/mnt/user/appdata/animaltracker`)
 - optional logging levels:
   - `LOG_LEVEL_DEFAULT`
@@ -43,11 +44,16 @@ cp .env.example .env
   - `ANIMALTRACKER_ADMIN_EMAIL`
   - `ANIMALTRACKER_ADMIN_PASSWORD`
 
-4. Start the container from repo root:
+4. Start or update the container from repo root:
 
 ```bash
-docker compose up -d --build
+bash ./unraid-update.sh
 ```
+
+The update script:
+- fast-forwards your repo on UnRaid
+- pulls the latest published image from GHCR
+- recreates only the `animaltracker` container to minimize downtime
 
 Persisted paths (from `docker-compose.yml`):
 - `${DATA_ROOT}/Data` → `/app/Data` (SQLite DB)
