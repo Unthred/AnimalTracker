@@ -1,0 +1,13 @@
+---
+description: Restart AnimalTracker after repo edits
+alwaysApply: true
+---
+
+# App Restart Workflow
+
+- After any code change in this repo, restart the running AnimalTracker app before reporting completion.
+- Check existing terminals or processes first and avoid spawning duplicate app instances.
+- Stop the current AnimalTracker app process and start a single fresh instance.
+- Leave unrelated watchers alone unless they also need a restart.
+- Wait long enough to confirm the app restarted successfully before reporting completion.
+- If restarting would be unsafe or ambiguous, ask before proceeding.

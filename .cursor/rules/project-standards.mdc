@@ -1,0 +1,19 @@
+---
+description: Core AnimalTracker project standards
+alwaysApply: true
+---
+
+# Project Standards
+
+- Build for a modern Blazor Web App on .NET 10 with server-side rendering and interactive components.
+- Prefer clean, maintainable solutions with minimal boilerplate.
+- Use modern C# features when they improve clarity, including primary constructors, expression-bodied members, and `field`-backed properties where appropriate.
+- Prefer strongly typed, readable code over clever abstractions.
+- Keep performance in mind: minimize allocations, avoid unnecessary re-rendering, and use efficient LINQ queries.
+- Keep deliverables concise and avoid adding unnecessary dependencies.
+- Keep data flow simple: components -> services -> `DbContext` -> database.
+- Keep business logic in services and keep services stateless where practical.
+- Use EF Core as the main data access layer; avoid raw SQL unless it is clearly justified for performance.
+- Use readable LINQ and prefer modern operators such as `LeftJoin` and `RightJoin` when they improve clarity.
+- Do not introduce component libraries such as MudBlazor, Telerik, or Syncfusion unless explicitly requested.
+- Prefer SignalR for real-time updates, and use SSE when it is the simpler fit.

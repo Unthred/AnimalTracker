@@ -28,9 +28,9 @@ This is a Blazor Web App using .NET 10 and server-side interactivity.
 ## Data Flow
 
 UI (Components)
-→ Services
-→ DbContext
-→ Database
+-> Services
+-> DbContext
+-> Database
 
 ## Folder Structure
 

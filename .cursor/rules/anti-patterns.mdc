@@ -1,0 +1,13 @@
+---
+description: Avoid known AnimalTracker anti-patterns
+alwaysApply: true
+---
+
+# Anti-Patterns
+
+- Do not add unnecessary layers such as repositories over EF Core unless there is a clear need.
+- Avoid excessive abstraction and over-engineering.
+- Do not place business logic inside Blazor components.
+- Do not use global or static mutable state for app behavior.
+- Do not call `StateHasChanged()` manually unless it is genuinely necessary.
+- Do not optimize prematurely without a concrete performance problem.

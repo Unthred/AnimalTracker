@@ -1,0 +1,13 @@
+---
+description: Spec-first development workflow
+alwaysApply: true
+---
+
+# Development Workflow
+
+- Follow a spec-first approach for new features and non-trivial changes.
+- Before implementing, clarify requirements, identify edge cases, propose a simple design, and confirm assumptions when needed.
+- When requirements are unclear, ask instead of guessing.
+- Prefer the simplest solution that satisfies the request.
+- Keep components UI-focused and lightweight.
+- Use `/Components` for reusable UI, `/Pages` for page-level components, `/Services` for business logic, and `/Data` for EF Core entities and `DbContext`.

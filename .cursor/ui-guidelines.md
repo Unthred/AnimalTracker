@@ -8,7 +8,7 @@ Avoid anything that looks like default HTML or basic styling.
 
 ## Tech Stack
 - Use Tailwind CSS for all styling
-- Use shadcn/ui components where possible
+- Use the project's shared Blazor UI components where possible
 - Avoid custom CSS unless absolutely necessary
 
 ---
