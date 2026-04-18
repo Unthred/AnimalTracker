@@ -43,6 +43,14 @@ cp .env.example .env
 - optional first-run admin bootstrap:
   - `ANIMALTRACKER_ADMIN_EMAIL`
   - `ANIMALTRACKER_ADMIN_PASSWORD`
+- optional SMTP email delivery:
+  - `EMAIL_SMTP_HOST`
+  - `EMAIL_SMTP_PORT`
+  - `EMAIL_SMTP_USERNAME`
+  - `EMAIL_SMTP_PASSWORD`
+  - `EMAIL_FROM_EMAIL`
+  - `EMAIL_FROM_NAME`
+  - `EMAIL_ENABLE_SSL`
 
 4. Start or update the container from repo root:
 
@@ -58,6 +66,11 @@ The update script:
 Persisted paths (from `docker-compose.yml`):
 - `${DATA_ROOT}/Data` → `/app/Data` (SQLite DB)
 - `${DATA_ROOT}/App_Data` → `/app/App_Data` (photos, backgrounds, data protection keys)
+
+### Email delivery
+- If `EMAIL_SMTP_HOST` and `EMAIL_FROM_EMAIL` are set, account confirmation and password reset emails are sent via SMTP.
+- Typical authenticated SMTP setup uses port `587` with `EMAIL_ENABLE_SSL=true`.
+- If SMTP is not configured, the app falls back to showing generated auth links in the UI for local/dev use.
 
 ### Admin account
 - If `ANIMALTRACKER_ADMIN_EMAIL` and `ANIMALTRACKER_ADMIN_PASSWORD` are set in `.env`, the admin user is created/ensured on startup.

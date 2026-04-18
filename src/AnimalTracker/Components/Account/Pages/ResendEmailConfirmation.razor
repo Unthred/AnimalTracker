@@ -11,6 +11,7 @@
 @inject IEmailSender<ApplicationUser> EmailSender
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
+@inject AnimalTracker.Services.EmailSettingsService EmailSettings
 
 <PageTitle>Resend email confirmation</PageTitle>
 
@@ -30,22 +31,37 @@
             </div>
             <button type="submit" class="w-100 btn btn-lg btn-primary">Resend</button>
         </EditForm>
+
+        @if (!string.IsNullOrWhiteSpace(confirmationLink))
+        {
+            <p class="mt-3" role="alert">
+                Email delivery is not configured for this environment. Use the generated
+                <a href="@confirmationLink"> email confirmation link</a>.
+            </p>
+        }
     </div>
 </div>
 
 @code {
     private string? message;
+    private string? confirmationLink;
 
     [SupplyParameterFromForm]
     private InputModel Input { get; set; } = default!;
 
+    [SupplyParameterFromQuery]
+    private string? Email { get; set; }
+
     protected override void OnInitialized()
     {
         Input ??= new();
+        if (!string.IsNullOrWhiteSpace(Email))
+            Input.Email = Email;
     }
 
     private async Task OnValidSubmitAsync()
     {
+        confirmationLink = null;
         var user = await UserManager.FindByEmailAsync(Input.Email!);
         if (user is null)
         {
@@ -60,6 +76,13 @@
             NavigationManager.ToAbsoluteUri("Account/ConfirmEmail").AbsoluteUri,
             new Dictionary<string, object?> { ["userId"] = userId, ["code"] = code });
         await EmailSender.SendConfirmationLinkAsync(user, Input.Email, HtmlEncoder.Default.Encode(callbackUrl));
+
+        if (await EmailSettings.GetEffectiveOptionsAsync() is null)
+        {
+            message = "Verification link generated.";
+            confirmationLink = callbackUrl;
+            return;
+        }
 
         message = "Verification email sent. Please check your email.";
     }

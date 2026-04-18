@@ -92,6 +92,10 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         builder.Entity<AppSettings>(e =>
         {
             e.Property(x => x.DefaultThemeMode).HasDefaultValue("system");
+            e.Property(x => x.EmailEnabled).HasDefaultValue(false);
+            e.Property(x => x.EmailPort).HasDefaultValue(587);
+            e.Property(x => x.EmailFromName).HasDefaultValue("AnimalTracker");
+            e.Property(x => x.EmailEnableSsl).HasDefaultValue(true);
             e.Property(x => x.CreatedAtUtc).HasDefaultValueSql("CURRENT_TIMESTAMP");
             e.Property(x => x.UpdatedAtUtc).HasDefaultValueSql("CURRENT_TIMESTAMP");
         });

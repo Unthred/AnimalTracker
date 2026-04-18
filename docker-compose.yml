@@ -9,6 +9,13 @@ services:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
       AnimalTracker__AdminEmail: ${ANIMALTRACKER_ADMIN_EMAIL:-}
       AnimalTracker__AdminPassword: ${ANIMALTRACKER_ADMIN_PASSWORD:-}
+      Email__Host: ${EMAIL_SMTP_HOST:-}
+      Email__Port: ${EMAIL_SMTP_PORT:-587}
+      Email__UserName: ${EMAIL_SMTP_USERNAME:-}
+      Email__Password: ${EMAIL_SMTP_PASSWORD:-}
+      Email__FromEmail: ${EMAIL_FROM_EMAIL:-}
+      Email__FromName: ${EMAIL_FROM_NAME:-AnimalTracker}
+      Email__EnableSsl: ${EMAIL_ENABLE_SSL:-true}
       Logging__LogLevel__Default: ${LOG_LEVEL_DEFAULT:-Information}
       Logging__LogLevel__Microsoft.AspNetCore: ${LOG_LEVEL_ASPNETCORE:-Warning}
       Logging__LogLevel__Microsoft.EntityFrameworkCore.Database.Command: ${LOG_LEVEL_EF_SQL:-Warning}

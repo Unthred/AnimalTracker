@@ -34,6 +34,24 @@ else
     <UICard>
         <StatusMessage Message="@errorMessage" />
 
+        @if (!string.IsNullOrWhiteSpace(resendConfirmationEmail))
+        {
+            <UIAlert Variant="UiAlertVariant.Warning" Class="mb-6">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        This account has not confirmed its email yet. Request a new confirmation email for
+                        <span class="font-semibold">@resendConfirmationEmail</span>.
+                    </div>
+                    <UIButton Href="@(NavigationManager.GetUriWithQueryParameters("Account/ResendEmailConfirmation", new Dictionary<string, object?> { ["email"] = resendConfirmationEmail }))"
+                              Variant="UiButtonVariant.Outline"
+                              Size="UiButtonSize.Sm"
+                              Class="w-full shrink-0 sm:w-auto">
+                        Resend confirmation
+                    </UIButton>
+                </div>
+            </UIAlert>
+        }
+
         <EditForm EditContext="editContext" method="post" OnSubmit="LoginUser" FormName="login" class="space-y-6">
             <DataAnnotationsValidator />
             <ValidationSummary class="text-danger" role="alert" />
@@ -85,6 +103,7 @@ else
 
 @code {
     private string? errorMessage;
+    private string? resendConfirmationEmail;
     private EditContext editContext = default!;
     private bool hasDefaultAuthImage;
     private long defaultAuthImageStamp;
@@ -118,6 +137,8 @@ else
 
     public async Task LoginUser()
     {
+        resendConfirmationEmail = null;
+
         if (!string.IsNullOrEmpty(Input.Passkey?.Error))
         {
             errorMessage = $"Error: {Input.Passkey.Error}";
@@ -138,9 +159,7 @@ else
                 return;
             }
 
-            // This doesn't count login failures towards account lockout
-            // To enable password failures to trigger account lockout, set lockoutOnFailure: true
-            result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false);
+            result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: true);
         }
 
         if (result.Succeeded)
@@ -167,23 +186,31 @@ else
         }
         else
         {
-            // Provide a more actionable message in Development without leaking details in production.
-            if (HttpContext.RequestServices.GetRequiredService<IHostEnvironment>().IsDevelopment())
+            var user = await UserManager.FindByEmailAsync(Input.Email);
+            if (result.IsNotAllowed && user is not null && !await UserManager.IsEmailConfirmedAsync(user))
             {
-                var user = await UserManager.FindByEmailAsync(Input.Email);
-                errorMessage = user is null
-                    ? "Error: Invalid login attempt. (No user found for that email.)"
-                    : result.IsNotAllowed
-                        ? "Error: Sign-in not allowed for this account."
-                        : result.RequiresTwoFactor
-                            ? "Error: Two-factor authentication is required."
-                            : result.IsLockedOut
-                                ? "Error: Account is locked out."
-                                : "Error: Invalid login attempt. (Wrong password?)";
+                resendConfirmationEmail = user.Email;
+                errorMessage = "Error: You must confirm your email before you can log in.";
             }
             else
+            // Provide a more actionable message in Development without leaking details in production.
             {
-                errorMessage = "Error: Invalid login attempt.";
+                if (HttpContext.RequestServices.GetRequiredService<IHostEnvironment>().IsDevelopment())
+                {
+                    errorMessage = user is null
+                        ? "Error: Invalid login attempt. (No user found for that email.)"
+                        : result.IsNotAllowed
+                            ? "Error: Sign-in not allowed for this account."
+                            : result.RequiresTwoFactor
+                                ? "Error: Two-factor authentication is required."
+                                : result.IsLockedOut
+                                    ? "Error: Account is locked out."
+                                    : "Error: Invalid login attempt. (Wrong password?)";
+                }
+                else
+                {
+                    errorMessage = "Error: Invalid login attempt.";
+                }
             }
 
             Logger.LogWarning("Login failed for email {Email}. Succeeded={Succeeded} NotAllowed={NotAllowed} LockedOut={LockedOut} Requires2FA={RequiresTwoFactor}",

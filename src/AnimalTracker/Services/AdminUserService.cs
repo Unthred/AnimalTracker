@@ -141,6 +141,18 @@ public sealed class AdminUserService(
         return newPassword;
     }
 
+    public async Task ConfirmEmailAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        var user = await userManager.FindByIdAsync(userId) ?? throw new InvalidOperationException("User not found.");
+        if (user.EmailConfirmed)
+            return;
+
+        user.EmailConfirmed = true;
+        var result = await userManager.UpdateAsync(user);
+        if (!result.Succeeded)
+            throw new InvalidOperationException(string.Join("; ", result.Errors.Select(e => e.Description)));
+    }
+
     private static string GeneratePassword()
     {
         // 20 chars base64-ish: strong enough and easy to paste.

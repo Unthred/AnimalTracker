@@ -156,38 +156,47 @@
         await emailStore.SetEmailAsync(user, Input.Email, CancellationToken.None);
 
         var result = await UserManager.CreateAsync(user);
-        if (result.Succeeded)
+        if (!result.Succeeded)
         {
-            result = await UserManager.AddLoginAsync(user, externalLoginInfo);
-            if (result.Succeeded)
+            message = $"Error: {string.Join(", ", result.Errors.Select(error => error.Description))}";
+            return;
+        }
+
+        result = await UserManager.AddLoginAsync(user, externalLoginInfo);
+        if (!result.Succeeded)
+        {
+            var deleteResult = await UserManager.DeleteAsync(user);
+            var allErrors = result.Errors.Select(error => error.Description);
+            if (!deleteResult.Succeeded)
             {
-                Logger.LogInformation("User created an account using {Name} provider.", externalLoginInfo.LoginProvider);
-
-                var userId = await UserManager.GetUserIdAsync(user);
-                var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
-                code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
-
-                var callbackUrl = NavigationManager.GetUriWithQueryParameters(
-                    NavigationManager.ToAbsoluteUri("Account/ConfirmEmail").AbsoluteUri,
-                    new Dictionary<string, object?> { ["userId"] = userId, ["code"] = code });
-                await EmailSender.SendConfirmationLinkAsync(user, Input.Email, HtmlEncoder.Default.Encode(callbackUrl));
-
-                // If account confirmation is required, we need to show the link if we don't have a real email sender
-                if (UserManager.Options.SignIn.RequireConfirmedAccount)
-                {
-                    RedirectManager.RedirectTo("Account/RegisterConfirmation", new() { ["email"] = Input.Email });
-                }
-                else
-                {
-                    await SignInManager.SignInAsync(user, isPersistent: false, externalLoginInfo.LoginProvider);
-                    await LoginAudit.RecordSuccessfulLoginAsync(user);
-                    RedirectManager.RedirectTo(ReturnUrl);
-                }
+                allErrors = allErrors.Concat(deleteResult.Errors.Select(error => error.Description));
             }
+
+            message = $"Error: {string.Join(", ", allErrors)}";
+            return;
+        }
+
+        Logger.LogInformation("User created an account using {Name} provider.", externalLoginInfo.LoginProvider);
+
+        var userId = await UserManager.GetUserIdAsync(user);
+        var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
+        code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
+
+        var callbackUrl = NavigationManager.GetUriWithQueryParameters(
+            NavigationManager.ToAbsoluteUri("Account/ConfirmEmail").AbsoluteUri,
+            new Dictionary<string, object?> { ["userId"] = userId, ["code"] = code });
+        await EmailSender.SendConfirmationLinkAsync(user, Input.Email, HtmlEncoder.Default.Encode(callbackUrl));
+
+        // If account confirmation is required, we need to show the link if we don't have a real email sender
+        if (UserManager.Options.SignIn.RequireConfirmedAccount)
+        {
+            RedirectManager.RedirectTo("Account/RegisterConfirmation", new() { ["email"] = Input.Email });
         }
         else
         {
-            message = $"Error: {string.Join(",", result.Errors.Select(error => error.Description))}";
+            await SignInManager.SignInAsync(user, isPersistent: false, externalLoginInfo.LoginProvider);
+            await LoginAudit.RecordSuccessfulLoginAsync(user);
+            RedirectManager.RedirectTo(ReturnUrl);
         }
     }
 

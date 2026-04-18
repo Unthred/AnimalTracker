@@ -1,0 +1,18 @@
+---
+description: Required styling contract for touched Blazor form sections
+alwaysApply: true
+---
+
+# Form Styling Contract
+
+- When adding or editing a form in a `.razor` file, treat the whole touched form section as a styling unit.
+- Do not leave mixed styling in a touched form section. If one field is modernized, matching sibling fields and actions in that section must also match the project standard.
+- Do not use Bootstrap/default form classes in touched form sections such as `form-control`, `form-floating`, `btn`, `row`, or `col-*`.
+- Every edited `InputText`, `InputNumber`, `InputSelect`, `InputTextArea`, `select`, `textarea`, and non-checkbox `input` must either:
+  - use an existing shared UI component, or
+  - use the exact standard control class string from `.cursor/ui-guidelines.md`.
+- Every edited checkbox must use the project's checkbox styling pattern, not the browser default checkbox.
+- Every edited field must be wrapped in `UIField` unless a shared component already owns the field structure.
+- Every validated field must include `ValidationMessage` with project-consistent styling.
+- Buttons in touched forms must use `UIButton` or the project's standard button styling, not raw Bootstrap buttons.
+- Before finishing any form change, verify there are no default-styled controls left in the touched form section in either light or dark mode.

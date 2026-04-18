@@ -1,0 +1,356 @@
+@page "/admin/email"
+@rendermode InteractiveServer
+
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Identity.UI.Services
+@using AnimalTracker.Components.Account
+@using AnimalTracker.Components.UI
+@using AnimalTracker.Data
+@using AnimalTracker.Services
+
+@attribute [Authorize]
+
+@inject AdminUserService AdminUsers
+@inject EmailSettingsService EmailSettings
+@inject SmtpIdentityEmailSender SmtpSender
+@inject NavigationManager NavigationManager
+
+<PageTitle>Email settings</PageTitle>
+
+<UIPageHeader Title="Email Settings" Description="Configure SMTP for account confirmation, password reset, and other transactional email." />
+
+<div class="mb-8 flex flex-wrap gap-3">
+    <UIButton Href="/admin" Variant="UiButtonVariant.Outline">Manage users</UIButton>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(message))
+{
+    <UIAlert Variant="@(message.StartsWith("Error", StringComparison.OrdinalIgnoreCase) ? UiAlertVariant.Danger : UiAlertVariant.Success)" Class="mb-6">
+        @message
+    </UIAlert>
+}
+
+@if (status is not null)
+{
+    <UICard Title="Configuration status">
+        <div class="space-y-3 text-sm text-slate-700 dark:text-slate-200">
+            <div><span class="font-semibold">Source:</span> @status.Source</div>
+            <div><span class="font-semibold">Enabled:</span> @(status.IsEnabled ? "Yes" : "No")</div>
+            <div><span class="font-semibold">Configured:</span> @(status.IsConfigured ? "Yes" : "No")</div>
+            <p class="text-slate-600 dark:text-slate-300">@status.Message</p>
+        </div>
+    </UICard>
+}
+
+<UICard Title="SMTP configuration" Class="mt-8">
+    <EditForm EditContext="editContext" class="space-y-6">
+        <DataAnnotationsValidator />
+        <ValidationSummary class="text-sm text-rose-600 dark:text-rose-400" role="alert" />
+
+        <UIField Label="Enable admin-managed email delivery" For="enabled" Hint="When enabled and complete, these settings override environment SMTP settings.">
+            <label for="enabled"
+                   class="flex min-h-[2.75rem] w-full max-w-xl cursor-pointer items-center gap-3 rounded-xl border border-slate-200/90 bg-white px-4 py-2.5 shadow-sm transition duration-200 ease-in-out hover:border-slate-300/90 dark:border-slate-700 dark:bg-slate-950/40 dark:hover:border-slate-600">
+                <InputCheckbox id="enabled" class="checkbox-soft size-[1.125rem] shrink-0" @bind-Value="model.Enabled" />
+                <span class="select-none text-sm font-medium text-slate-800 dark:text-slate-100">Use SMTP settings saved in the admin page</span>
+            </label>
+        </UIField>
+
+        <div class="grid min-w-0 grid-cols-1 gap-6 md:grid-cols-2">
+            <UIField Label="SMTP host" For="host">
+                <InputText id="host" class="@StandardInputClass" @bind-Value="model.Host" />
+                <ValidationMessage For="() => model.Host" class="text-sm text-rose-600 dark:text-rose-400" />
+            </UIField>
+
+            <UIField Label="Port" For="port">
+                <InputNumber id="port" class="@StandardInputClass" @bind-Value="model.Port" />
+                <ValidationMessage For="() => model.Port" class="text-sm text-rose-600 dark:text-rose-400" />
+            </UIField>
+
+            <UIField Label="Username" For="userName" Hint="Optional if your SMTP relay does not require authentication.">
+                <InputText id="userName" class="@StandardInputClass" @bind-Value="model.UserName" />
+                <ValidationMessage For="() => model.UserName" class="text-sm text-rose-600 dark:text-rose-400" />
+            </UIField>
+
+            <UIField Label="Password" For="password" Hint="Leave blank to keep the saved password.">
+                <InputText id="password" type="password" class="@StandardInputClass" @bind-Value="model.Password" />
+                <ValidationMessage For="() => model.Password" class="text-sm text-rose-600 dark:text-rose-400" />
+            </UIField>
+
+            <UIField Label="From email" For="fromEmail">
+                <InputText id="fromEmail" class="@StandardInputClass" @bind-Value="model.FromEmail" />
+                <ValidationMessage For="() => model.FromEmail" class="text-sm text-rose-600 dark:text-rose-400" />
+            </UIField>
+
+            <UIField Label="From name" For="fromName">
+                <InputText id="fromName" class="@StandardInputClass" @bind-Value="model.FromName" />
+                <ValidationMessage For="() => model.FromName" class="text-sm text-rose-600 dark:text-rose-400" />
+            </UIField>
+        </div>
+
+        <UIField Label="Connection options" For="enableSsl" Hint="Credentials are encrypted with ASP.NET Data Protection before they are stored.">
+            <div class="space-y-3">
+                <label for="enableSsl"
+                       class="flex min-h-[2.75rem] w-full max-w-xl cursor-pointer items-center gap-3 rounded-xl border border-slate-200/90 bg-white px-4 py-2.5 shadow-sm transition duration-200 ease-in-out hover:border-slate-300/90 dark:border-slate-700 dark:bg-slate-950/40 dark:hover:border-slate-600">
+                    <InputCheckbox id="enableSsl" class="checkbox-soft size-[1.125rem] shrink-0" @bind-Value="model.EnableSsl" />
+                    <span class="select-none text-sm font-medium text-slate-800 dark:text-slate-100">Use TLS/SSL for SMTP</span>
+                </label>
+
+                @if (model.HasSavedPassword)
+                {
+                    <label for="clearPassword"
+                           class="flex min-h-[2.75rem] w-full max-w-xl cursor-pointer items-center gap-3 rounded-xl border border-slate-200/90 bg-white px-4 py-2.5 shadow-sm transition duration-200 ease-in-out hover:border-slate-300/90 dark:border-slate-700 dark:bg-slate-950/40 dark:hover:border-slate-600">
+                        <InputCheckbox id="clearPassword" class="checkbox-soft size-[1.125rem] shrink-0" @bind-Value="model.ClearSavedPassword" />
+                        <span class="select-none text-sm font-medium text-slate-800 dark:text-slate-100">Clear the saved password</span>
+                    </label>
+                }
+            </div>
+        </UIField>
+
+        <div class="border-t border-slate-200/80 pt-6 dark:border-slate-800/80">
+            <div class="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
+                <UIField Label="Test email recipient" For="testEmail" Hint="Sends a test message using the current form values.">
+                    <InputText id="testEmail" class="@StandardInputClass" @bind-Value="model.TestEmail" />
+                    <ValidationMessage For="() => model.TestEmail" class="text-sm text-rose-600 dark:text-rose-400" />
+                </UIField>
+                <UIButton Variant="UiButtonVariant.Outline" Class="w-full sm:w-auto" Disabled="@isSendingTestEmail" @onclick="SendTestEmailAsync">@(isSendingTestEmail ? "Sending..." : "Send test email")</UIButton>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(testEmailProgressMessage))
+            {
+                <p class="mt-3 text-sm text-slate-600 dark:text-slate-300" role="status" aria-live="polite">
+                    @testEmailProgressMessage
+                </p>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(testEmailResult))
+            {
+                <UIAlert Variant="@(testEmailResultSucceeded ? UiAlertVariant.Success : UiAlertVariant.Danger)" Class="mt-4">
+                    @testEmailResult
+                </UIAlert>
+            }
+        </div>
+
+        <div class="flex justify-stretch border-t border-slate-200/80 pt-5 dark:border-slate-800/80 sm:justify-end">
+            <UIButton Type="button" Variant="UiButtonVariant.Primary" Class="w-full sm:w-auto" @onclick="SaveAsync">Save email settings</UIButton>
+        </div>
+    </EditForm>
+</UICard>
+
+@code {
+    private const string StandardInputClass = "w-full min-w-0 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80";
+    private string? message;
+    private string? testEmailResult;
+    private string? testEmailProgressMessage;
+    private bool testEmailResultSucceeded;
+    private bool isSendingTestEmail;
+    private EmailSettingsStatus? status;
+    private Model model = new();
+    private EditContext editContext = default!;
+    private ValidationMessageStore validationMessageStore = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!await AdminUsers.IsCurrentUserAdminAsync())
+        {
+            NavigationManager.NavigateTo($"/Account/AccessDenied?ReturnUrl={Uri.EscapeDataString("/admin/email")}", forceLoad: true);
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var stored = await EmailSettings.GetStoredOptionsAsync();
+        var hasSavedPassword = await EmailSettings.HasStoredPasswordAsync();
+
+        model = new Model
+        {
+            Enabled = stored.Enabled,
+            Host = stored.Host,
+            Port = stored.Port,
+            UserName = stored.UserName ?? "",
+            FromEmail = stored.FromEmail,
+            FromName = string.IsNullOrWhiteSpace(stored.FromName) ? "AnimalTracker" : stored.FromName,
+            EnableSsl = stored.EnableSsl,
+            HasSavedPassword = hasSavedPassword
+        };
+
+        editContext = new EditContext(model);
+        validationMessageStore = new ValidationMessageStore(editContext);
+        status = await EmailSettings.GetStatusAsync();
+    }
+
+    private async Task SaveAsync()
+    {
+        message = null;
+        testEmailResult = null;
+        testEmailProgressMessage = null;
+        if (!ValidateSettings())
+            return;
+
+        try
+        {
+            await EmailSettings.SaveStoredOptionsAsync(
+                BuildOptions(includeSavedPasswordFallback: false),
+                keepExistingPassword: string.IsNullOrWhiteSpace(model.Password) && model.HasSavedPassword && !model.ClearSavedPassword,
+                clearStoredPassword: model.ClearSavedPassword);
+
+            await LoadAsync();
+            message = "Email settings saved.";
+        }
+        catch (Exception ex)
+        {
+            message = $"Error: {ex.Message}";
+        }
+    }
+
+    private async Task SendTestEmailAsync()
+    {
+        message = null;
+        testEmailResult = null;
+        testEmailResultSucceeded = false;
+        testEmailProgressMessage = "Validating test email settings...";
+        if (!ValidateSettings(requireTestEmail: true))
+        {
+            testEmailProgressMessage = null;
+            return;
+        }
+
+        try
+        {
+            isSendingTestEmail = true;
+            testEmailProgressMessage = "Sending test email...";
+            var stored = await EmailSettings.GetStoredOptionsAsync();
+            var options = BuildOptions(includeSavedPasswordFallback: true, storedPassword: stored.Password);
+            await SmtpSender.SendEmailAsync(
+                options,
+                model.TestEmail,
+                "AnimalTracker test email",
+                "<p>This is a test email from AnimalTracker.</p><p>Your SMTP settings are working.</p>");
+
+            testEmailResultSucceeded = true;
+            testEmailResult = $"Test email sent to {model.TestEmail} via {options.Host}:{options.Port}.";
+            testEmailProgressMessage = "Test email sent successfully.";
+        }
+        catch (Exception ex)
+        {
+            testEmailResult = $"Test email failed: {GetErrorMessage(ex)}";
+            testEmailProgressMessage = "Test email failed.";
+        }
+        finally
+        {
+            isSendingTestEmail = false;
+        }
+    }
+
+    private bool ValidateSettings(bool requireTestEmail = false)
+    {
+        validationMessageStore.Clear();
+        var isValid = editContext.Validate();
+        var hasManualErrors = false;
+
+        if (model.Enabled)
+        {
+            if (string.IsNullOrWhiteSpace(model.Host))
+            {
+                validationMessageStore.Add(FieldIdentifier.Create(() => model.Host), "SMTP host is required when admin email delivery is enabled.");
+                hasManualErrors = true;
+            }
+
+            if (string.IsNullOrWhiteSpace(model.FromEmail))
+            {
+                validationMessageStore.Add(FieldIdentifier.Create(() => model.FromEmail), "From email is required when admin email delivery is enabled.");
+                hasManualErrors = true;
+            }
+        }
+
+        if (requireTestEmail)
+        {
+            if (!model.Enabled)
+            {
+                validationMessageStore.Add(FieldIdentifier.Create(() => model.Enabled), "Enable admin-managed email delivery before sending a test email.");
+                hasManualErrors = true;
+            }
+
+            if (string.IsNullOrWhiteSpace(model.TestEmail))
+            {
+                validationMessageStore.Add(FieldIdentifier.Create(() => model.TestEmail), "Enter a recipient email address for the test email.");
+                hasManualErrors = true;
+            }
+        }
+
+        if (hasManualErrors)
+            editContext.NotifyValidationStateChanged();
+
+        return isValid && !hasManualErrors;
+    }
+
+    private SmtpEmailOptions BuildOptions(bool includeSavedPasswordFallback, string? storedPassword = null)
+    {
+        var password = model.Password;
+        if (includeSavedPasswordFallback && string.IsNullOrWhiteSpace(password) && model.HasSavedPassword && !model.ClearSavedPassword)
+        {
+            password = storedPassword;
+        }
+
+        return new SmtpEmailOptions
+        {
+            Enabled = model.Enabled,
+            Host = model.Host,
+            Port = model.Port,
+            UserName = model.UserName,
+            Password = model.ClearSavedPassword ? null : password,
+            FromEmail = model.FromEmail,
+            FromName = model.FromName,
+            EnableSsl = model.EnableSsl
+        };
+    }
+
+    private static string GetErrorMessage(Exception ex)
+    {
+        var messages = new List<string>();
+        Exception? current = ex;
+
+        while (current is not null)
+        {
+            if (!string.IsNullOrWhiteSpace(current.Message))
+                messages.Add(current.Message.Trim());
+
+            current = current.InnerException;
+        }
+
+        return messages.Count == 0 ? "Unknown error." : string.Join(" -> ", messages.Distinct());
+    }
+
+    private sealed class Model
+    {
+        public bool Enabled { get; set; }
+
+        public string Host { get; set; } = "";
+
+        [Range(1, 65535)]
+        public int Port { get; set; } = 587;
+
+        public string UserName { get; set; } = "";
+
+        [DataType(DataType.Password)]
+        public string Password { get; set; } = "";
+
+        [EmailAddress]
+        public string FromEmail { get; set; } = "";
+
+        public string FromName { get; set; } = "AnimalTracker";
+
+        public bool EnableSsl { get; set; } = true;
+
+        [EmailAddress]
+        public string TestEmail { get; set; } = "";
+
+        public bool HasSavedPassword { get; set; }
+
+        public bool ClearSavedPassword { get; set; }
+    }
+}

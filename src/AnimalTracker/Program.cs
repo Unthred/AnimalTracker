@@ -50,7 +50,7 @@ builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 builder.Services.AddIdentityCore<ApplicationUser>(options =>
     {
-        options.SignIn.RequireConfirmedAccount = false;
+        options.SignIn.RequireConfirmedAccount = true;
         // Internet-facing defaults: lockout can be used by admins and also limits brute force.
         options.Lockout.AllowedForNewUsers = true;
         options.Lockout.MaxFailedAccessAttempts = 10;
@@ -63,7 +63,9 @@ builder.Services.AddIdentityCore<ApplicationUser>(options =>
     .AddSignInManager()
     .AddDefaultTokenProviders();
 
-builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
+builder.Services.AddScoped<IdentityNoOpEmailSender>();
+builder.Services.AddScoped<SmtpIdentityEmailSender>();
+builder.Services.AddScoped<IEmailSender<ApplicationUser>, ConfigurableIdentityEmailSender>();
 builder.Services.AddScoped<IClaimsTransformation, RoleClaimsTransformation>();
 
 // Persist keys so auth cookies survive container restarts.
@@ -79,6 +81,8 @@ builder.Services.AddHttpClient(nameof(SpeciesCatalogSyncService), client =>
 });
 builder.Services.Configure<RecognitionOptions>(builder.Configuration.GetSection(RecognitionOptions.SectionName));
 builder.Services.Configure<PhotoImportOptions>(builder.Configuration.GetSection(PhotoImportOptions.SectionName));
+builder.Services.Configure<SmtpEmailOptions>(builder.Configuration.GetSection(SmtpEmailOptions.SectionName));
+builder.Services.AddScoped<EmailSettingsService>();
 builder.Services.AddScoped<ExifMetadataService>();
 builder.Services.AddScoped<PhotoImportService>();
 builder.Services.AddHttpClient(nameof(LocalAnimalRecognitionClient), (sp, client) =>
@@ -127,6 +131,7 @@ using (var scope = app.Services.CreateScope())
     await db.Database.MigrateAsync();
     await EnsureSqliteUserSettingsColumnsAsync(db);
     await EnsureSqliteAppSettingsTableAsync(db);
+    await EnsureSqliteAppSettingsColumnsAsync(db);
     var adminUsers = scope.ServiceProvider.GetRequiredService<AdminUserService>();
     await adminUsers.EnsureAdminRoleAsync();
     await EnsureAdminUserAsync(scope.ServiceProvider);
@@ -395,10 +400,67 @@ static async Task EnsureSqliteAppSettingsTableAsync(ApplicationDbContext db)
             Id INTEGER NOT NULL CONSTRAINT PK_AppSettings PRIMARY KEY AUTOINCREMENT,
             DefaultThemeMode TEXT NOT NULL DEFAULT 'system',
             DefaultAuthImageRelativePath TEXT NULL,
+            ActiveSpeciesRegionKey TEXT NULL,
+            ActiveSpeciesRegionName TEXT NULL,
+            EmailEnabled INTEGER NOT NULL DEFAULT 0,
+            EmailHost TEXT NULL,
+            EmailPort INTEGER NULL DEFAULT 587,
+            EmailUserNameProtected TEXT NULL,
+            EmailPasswordProtected TEXT NULL,
+            EmailFromEmail TEXT NULL,
+            EmailFromName TEXT NULL DEFAULT 'AnimalTracker',
+            EmailEnableSsl INTEGER NOT NULL DEFAULT 1,
             CreatedAtUtc TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP),
             UpdatedAtUtc TEXT NOT NULL DEFAULT (CURRENT_TIMESTAMP)
         );
         """);
+}
+
+static async Task EnsureSqliteAppSettingsColumnsAsync(ApplicationDbContext db)
+{
+    if (!db.Database.IsSqlite())
+        return;
+
+    static async Task<HashSet<string>> GetColumnNamesAsync(ApplicationDbContext db)
+    {
+        await using var conn = db.Database.GetDbConnection();
+        if (conn.State != System.Data.ConnectionState.Open)
+            await conn.OpenAsync();
+
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = "PRAGMA table_info('AppSettings');";
+
+        var cols = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        await using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            var name = reader["name"]?.ToString();
+            if (!string.IsNullOrWhiteSpace(name))
+                cols.Add(name);
+        }
+
+        return cols;
+    }
+
+    async Task TryAddAsync(string columnName, string sql)
+    {
+        var cols = await GetColumnNamesAsync(db);
+        if (cols.Contains(columnName))
+            return;
+
+        await db.Database.ExecuteSqlRawAsync(sql);
+    }
+
+    await TryAddAsync("ActiveSpeciesRegionKey", "ALTER TABLE AppSettings ADD COLUMN ActiveSpeciesRegionKey TEXT NULL");
+    await TryAddAsync("ActiveSpeciesRegionName", "ALTER TABLE AppSettings ADD COLUMN ActiveSpeciesRegionName TEXT NULL");
+    await TryAddAsync("EmailEnabled", "ALTER TABLE AppSettings ADD COLUMN EmailEnabled INTEGER NOT NULL DEFAULT 0");
+    await TryAddAsync("EmailHost", "ALTER TABLE AppSettings ADD COLUMN EmailHost TEXT NULL");
+    await TryAddAsync("EmailPort", "ALTER TABLE AppSettings ADD COLUMN EmailPort INTEGER NULL DEFAULT 587");
+    await TryAddAsync("EmailUserNameProtected", "ALTER TABLE AppSettings ADD COLUMN EmailUserNameProtected TEXT NULL");
+    await TryAddAsync("EmailPasswordProtected", "ALTER TABLE AppSettings ADD COLUMN EmailPasswordProtected TEXT NULL");
+    await TryAddAsync("EmailFromEmail", "ALTER TABLE AppSettings ADD COLUMN EmailFromEmail TEXT NULL");
+    await TryAddAsync("EmailFromName", "ALTER TABLE AppSettings ADD COLUMN EmailFromName TEXT NULL DEFAULT 'AnimalTracker'");
+    await TryAddAsync("EmailEnableSsl", "ALTER TABLE AppSettings ADD COLUMN EmailEnableSsl INTEGER NOT NULL DEFAULT 1");
 }
 
 static async Task EnsureAdminUserAsync(IServiceProvider sp)

@@ -16,6 +16,7 @@ alwaysApply: true
 - Prefer card-based layouts, consistent spacing, rounded corners, soft shadows, and subtle 200ms transitions.
 - Reuse shared UI components for buttons, cards, and inputs whenever possible.
 - When editing forms, wrap fields in `UIField`, keep spacing consistent, and add `ValidationMessage` for validated fields.
+- When touching any form section, restyle the full affected section to the project standard instead of leaving mixed old/new controls.
 - Do not leave default browser-styled controls in touched areas.
 - If a shared component does not fit, use the project's standard input class string from `.cursor/ui-guidelines.md`.
 - Always follow the detailed UI guidance in `.cursor/ui-guidelines.md` for UI work.

@@ -18,6 +18,27 @@ public sealed class AppSettings
     [MaxLength(200)]
     public string? ActiveSpeciesRegionName { get; set; }
 
+    public bool EmailEnabled { get; set; }
+
+    [MaxLength(256)]
+    public string? EmailHost { get; set; }
+
+    public int? EmailPort { get; set; }
+
+    [MaxLength(1024)]
+    public string? EmailUserNameProtected { get; set; }
+
+    [MaxLength(4096)]
+    public string? EmailPasswordProtected { get; set; }
+
+    [MaxLength(256)]
+    public string? EmailFromEmail { get; set; }
+
+    [MaxLength(200)]
+    public string? EmailFromName { get; set; }
+
+    public bool EmailEnableSsl { get; set; } = true;
+
     public DateTime CreatedAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
 }
