@@ -1,0 +1,7 @@
+<span class="inline-flex max-w-full items-center self-center rounded-full border border-slate-200/90 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+    <span class="truncate">Species region: @(string.IsNullOrWhiteSpace(RegionName) ? "Not selected" : RegionName)</span>
+</span>
+
+@code {
+    [Parameter] public string? RegionName { get; set; }
+}

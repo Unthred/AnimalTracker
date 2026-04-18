@@ -25,19 +25,11 @@
             <input id="q" type="search" class="w-full min-w-0 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80" value="@query" @oninput="OnSearchInputAsync" />
         </UIField>
         <UIField Label="Species" For="species">
-            <input id="species"
-                   list="species-options"
-                   class="w-full min-w-0 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80"
-                   placeholder="All or type to filter"
-                   autocomplete="off"
-                   value="@speciesName"
-                   @oninput="OnSpeciesInputAsync" />
-            <datalist id="species-options">
-                @foreach (var s in species)
-                {
-                    <option value="@s.Name"></option>
-                }
-            </datalist>
+            <UISpeciesSelect id="species"
+                             Items="species"
+                             EmptyLabel="All"
+                             @bind-Value="speciesId"
+                             @bind-Value:after="ScheduleReloadAsync" />
         </UIField>
     </div>
 </UICard>
@@ -82,7 +74,6 @@
     private CancellationTokenSource? filterDebounceCts;
 
     private string? query;
-    private string? speciesName;
     private int? speciesId;
 
     protected override void OnInitialized() =>
@@ -107,29 +98,13 @@
     private async Task ReloadAsync()
     {
         loading = true;
-        speciesId = ResolveSpeciesId(speciesName);
         animals = await Animals.SearchAsync(query, speciesId);
         loading = false;
-    }
-
-    private int? ResolveSpeciesId(string? name)
-    {
-        var trimmed = (name ?? "").Trim();
-        if (string.IsNullOrWhiteSpace(trimmed))
-            return null;
-
-        return species.FirstOrDefault(x => string.Equals(x.Name, trimmed, StringComparison.OrdinalIgnoreCase))?.Id;
     }
 
     private async Task OnSearchInputAsync(ChangeEventArgs e)
     {
         query = e.Value?.ToString();
-        await ScheduleReloadAsync();
-    }
-
-    private async Task OnSpeciesInputAsync(ChangeEventArgs e)
-    {
-        speciesName = e.Value?.ToString();
         await ScheduleReloadAsync();
     }
 

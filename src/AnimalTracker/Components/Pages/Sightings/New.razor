@@ -8,6 +8,7 @@
 @using AnimalTracker.Components.UI
 @using AnimalTracker.Data.Entities
 @using AnimalTracker.Data
+@using System.Linq
 @using SixLabors.ImageSharp
 @using SixLabors.ImageSharp.Metadata.Profiles.Exif
 @inject SightingService Sightings
@@ -22,85 +23,67 @@
 
 <PageTitle>Add Sighting</PageTitle>
 
-<UIPageHeader Title="Add sighting" Description="Log a wildlife observation with time, place, and species." />
-
-<div class="mb-4">
-    <span class="inline-flex items-center rounded-full border border-slate-200/90 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
-        Species region: @(string.IsNullOrWhiteSpace(activeSpeciesRegionName) ? "Not selected" : activeSpeciesRegionName)
-    </span>
-</div>
+<UIPageHeader Title="Add sighting" Description="Log a wildlife observation with time, place, and species.">
+    <Actions>
+        <UISpeciesRegionBadge RegionName="@activeSpeciesRegionName" />
+    </Actions>
+</UIPageHeader>
 
 <UICard>
     <EditForm Model="model" OnValidSubmit="SaveAsync" class="space-y-6">
         <DataAnnotationsValidator />
 
-        <div class="grid min-w-0 grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8">
-            <UIField Label="When" For="occurredAt">
-                <div class="min-w-0">
-                    <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Date</span>
-                    <UIDatePicker id="occurredAt" @bind-Value="model.OccurredAtLocalDate" />
-                    <ValidationMessage For="() => model.OccurredAtLocalDate" />
-                </div>
-            </UIField>
+        <div class="min-w-0 space-y-2">
+            <div class="grid min-w-0 grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8 sm:items-start">
+                <UIField Label="When" LabelClass="font-semibold" For="occurredAt">
+                    <div class="min-w-0">
+                        <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Date</span>
+                        <UIDatePicker id="occurredAt" @bind-Value="model.OccurredAtLocalDate" />
+                        <ValidationMessage For="() => model.OccurredAtLocalDate" />
+                    </div>
+                </UIField>
 
-            <UIField Label="Time" For="occurredHour" Hint="24-hour clock using the same dropdown styling as Species and Location (no OS time picker).">
-                <div class="grid min-w-0 grid-cols-2 gap-3 sm:gap-4">
-                    <div class="min-w-0">
-                        <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Hour</span>
-                        <select id="occurredHour" class="w-full min-w-0 px-3 py-2.5" @bind="hourPart" @bind:after="SyncModelTimeFromParts">
-                            @for (var h = 0; h < 24; h++)
-                            {
-                                <option value="@h">@h.ToString("00")</option>
-                            }
-                        </select>
+                <UIField Label="Time" LabelClass="font-semibold" For="occurredHour">
+                    <div class="grid min-w-0 grid-cols-2 gap-3 sm:gap-4">
+                        <div class="min-w-0">
+                            <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Hour</span>
+                            <select id="occurredHour" class="w-full min-w-0 px-3 py-2.5" @bind="hourPart" @bind:after="SyncModelTimeFromParts">
+                                @for (var h = 0; h < 24; h++)
+                                {
+                                    <option value="@h">@h.ToString("00")</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="min-w-0">
+                            <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Minute</span>
+                            <select id="occurredMinute" class="w-full min-w-0 px-3 py-2.5" @bind="minutePart" @bind:after="SyncModelTimeFromParts">
+                                @for (var m = 0; m < 60; m++)
+                                {
+                                    <option value="@m">@m.ToString("00")</option>
+                                }
+                            </select>
+                        </div>
                     </div>
-                    <div class="min-w-0">
-                        <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Minute</span>
-                        <select id="occurredMinute" class="w-full min-w-0 px-3 py-2.5" @bind="minutePart" @bind:after="SyncModelTimeFromParts">
-                            @for (var m = 0; m < 60; m++)
-                            {
-                                <option value="@m">@m.ToString("00")</option>
-                            }
-                        </select>
-                    </div>
-                </div>
-            </UIField>
+                </UIField>
+            </div>
+            <p class="text-xs leading-relaxed text-slate-600 dark:text-slate-400">24-hour clock using the same dropdown styling as Species and Location (no OS time picker).</p>
         </div>
 
         <div class="grid min-w-0 grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8">
             <UIField Label="Species" For="species">
-                <select id="species" class="w-full min-w-0 px-3 py-2.5" @bind="model.SpeciesId">
-                    <option value="">Select…</option>
-                    @foreach (var s in species)
-                    {
-                        <option value="@s.Id">@s.Name</option>
-                    }
-                </select>
-                @if (species.Count == 0)
-                {
-                    <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">Select a species region in Settings to load this list.</p>
-                }
-                <div class="mt-2">
-                    <UIButton Href="/species" target="_blank" rel="noreferrer noopener" Variant="UiButtonVariant.Outline" Size="UiButtonSize.Sm">
-                        Lookup species
-                    </UIButton>
-                </div>
+                <UISpeciesSelect id="species"
+                                 Items="species"
+                                 ShowEmptyItemsHint
+                                 ShowLookupLink
+                                 @bind-Value="model.SpeciesId" />
                 <ValidationMessage For="() => model.SpeciesId" />
             </UIField>
 
             <UIField Label="Location" For="location">
-                <InputText id="location"
-                           list="location-options"
-                           class="w-full min-w-0 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80"
-                           placeholder="Default or type a new location"
-                           autocomplete="off"
-                           @bind-Value="model.LocationName" />
-                <datalist id="location-options">
-                    @foreach (var l in locations)
-                    {
-                        <option value="@l.Name"></option>
-                    }
-                </datalist>
+                <UILocationNameCombobox id="location"
+                                        Items="locations"
+                                        Placeholder="Select or type location..."
+                                        @bind-Value="model.LocationName" />
                 <div class="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <p class="text-xs text-slate-500 dark:text-slate-400">Optional. Type a name and click Add to create it now.</p>
                     <UIButton Type="button" Variant="UiButtonVariant.Outline" Size="UiButtonSize.Sm" @onclick="AddLocationAsync">Add location</UIButton>
@@ -114,45 +97,53 @@
 
         <div class="grid min-w-0 grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8">
             <UIField Label="Linked animal" For="animal">
-                <select id="animal" class="w-full min-w-0 px-3 py-2.5" @bind="model.AnimalId">
-                    <option value="">None (unknown)</option>
-                    @foreach (var a in animals)
-                    {
-                        <option value="@a.Id">@GetAnimalLabel(a)</option>
-                    }
-                </select>
+                <SearchableCombobox TValue="int?"
+                                    id="animal"
+                                    Items="@AnimalComboboxOptions"
+                                    EmptyRowWhenUnfiltered="@AnimalEmptyOption"
+                                    @bind-Value="model.AnimalId"
+                                    Placeholder="Select linked animal..."
+                                    NoResultsText="No animals found"
+                                    AllowClear="true"
+                                    ChevronAriaLabel="Show animals" />
             </UIField>
 
             <UIField Label="Behavior" For="behavior">
-                <select id="behavior" class="w-full min-w-0 px-3 py-2.5" @bind="model.Behavior">
-                    <option value="">Not specified</option>
-                    @foreach (var behavior in Enum.GetValues<SightingBehavior>())
-                    {
-                        <option value="@behavior">@behavior</option>
-                    }
-                </select>
+                <SearchableCombobox TValue="SightingBehavior?"
+                                    id="behavior"
+                                    Items="@BehaviorComboboxOptions"
+                                    EmptyRowWhenUnfiltered="@BehaviorEmptyOption"
+                                    @bind-Value="model.Behavior"
+                                    Placeholder="Select behavior..."
+                                    NoResultsText="No behaviors found"
+                                    AllowClear="true"
+                                    ChevronAriaLabel="Show behaviors" />
             </UIField>
         </div>
 
         <div class="grid min-w-0 grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8">
             <UIField Label="Species confidence" For="speciesConfidence">
-                <select id="speciesConfidence" class="w-full min-w-0 px-3 py-2.5" @bind="model.SpeciesConfidence">
-                    <option value="">Not specified</option>
-                    @foreach (var confidence in Enum.GetValues<SightingConfidence>())
-                    {
-                        <option value="@confidence">@confidence</option>
-                    }
-                </select>
+                <SearchableCombobox TValue="SightingConfidence?"
+                                    id="speciesConfidence"
+                                    Items="@ConfidenceComboboxOptions"
+                                    EmptyRowWhenUnfiltered="@ConfidenceEmptyOption"
+                                    @bind-Value="model.SpeciesConfidence"
+                                    Placeholder="Select species confidence..."
+                                    NoResultsText="No confidence values found"
+                                    AllowClear="true"
+                                    ChevronAriaLabel="Show species confidence options" />
             </UIField>
 
             <UIField Label="Individual confidence" For="individualConfidence">
-                <select id="individualConfidence" class="w-full min-w-0 px-3 py-2.5" @bind="model.IndividualConfidence">
-                    <option value="">Not specified</option>
-                    @foreach (var confidence in Enum.GetValues<SightingConfidence>())
-                    {
-                        <option value="@confidence">@confidence</option>
-                    }
-                </select>
+                <SearchableCombobox TValue="SightingConfidence?"
+                                    id="individualConfidence"
+                                    Items="@ConfidenceComboboxOptions"
+                                    EmptyRowWhenUnfiltered="@ConfidenceEmptyOption"
+                                    @bind-Value="model.IndividualConfidence"
+                                    Placeholder="Select individual confidence..."
+                                    NoResultsText="No confidence values found"
+                                    AllowClear="true"
+                                    ChevronAriaLabel="Show individual confidence options" />
             </UIField>
         </div>
 
@@ -190,8 +181,38 @@
             <p class="text-sm text-slate-600 dark:text-slate-300">@coordinateMessage</p>
         }
 
-        <UIField Label="Observed until" For="observedUntil" Hint="Optional end time if you watched this behavior over a period.">
-            <InputDate id="observedUntil" TValue="DateTime?" Type="InputDateType.DateTimeLocal" class="w-full min-w-0 px-3 py-2.5" @bind-Value="model.ObservedUntilLocal" />
+        <UIField Label="Observed until" For="observedUntilDate" Hint="Optional end time if you watched this behavior over a period.">
+            <div class="grid min-w-0 grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8 sm:items-end">
+                <div class="min-w-0">
+                    <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Date</span>
+                    <UIDatePicker id="observedUntilDate"
+                                  @bind-NullableValue="model.ObservedUntilLocalDate"
+                                  @bind-NullableValue:after="OnObservedUntilDateChangedAsync" />
+                </div>
+                <div class="min-w-0">
+                    <span class="mb-1 block text-xs font-semibold text-slate-700 dark:text-slate-200">Time</span>
+                    <div class="grid min-w-0 grid-cols-2 gap-3 sm:gap-4">
+                        <div class="min-w-0">
+                            <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Hour</span>
+                            <select id="observedUntilHour" class="w-full min-w-0 px-3 py-2.5" @bind="observedUntilHourPart" @bind:after="SyncObservedUntilTimeFromParts">
+                                @for (var h = 0; h < 24; h++)
+                                {
+                                    <option value="@h">@h.ToString("00")</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="min-w-0">
+                            <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Minute</span>
+                            <select id="observedUntilMinute" class="w-full min-w-0 px-3 py-2.5" @bind="observedUntilMinutePart" @bind:after="SyncObservedUntilTimeFromParts">
+                                @for (var m = 0; m < 60; m++)
+                                {
+                                    <option value="@m">@m.ToString("00")</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </UIField>
 
         <UIField Label="Notes" For="notes">
@@ -223,9 +244,27 @@
     private List<Location> locations = [];
     private List<Animal> animals = [];
 
+    private static readonly ComboboxOption<SightingBehavior?> BehaviorEmptyOption = new(default, "Not specified");
+
+    private static readonly ComboboxOption<SightingConfidence?> ConfidenceEmptyOption = new(default, "Not specified");
+
+    private IReadOnlyList<ComboboxOption<int?>> AnimalComboboxOptions =>
+        animals.Select(a => new ComboboxOption<int?>(a.Id, GetAnimalLabel(a)))
+            .ToArray();
+
+    private static readonly ComboboxOption<SightingBehavior?>[] BehaviorComboboxOptions =
+        ComboboxOptionList.ForNullableEnumValues<SightingBehavior>();
+
+    private static readonly ComboboxOption<SightingConfidence?>[] ConfidenceComboboxOptions =
+        ComboboxOptionList.ForNullableEnumValues<SightingConfidence>();
+
+    private static readonly ComboboxOption<int?> AnimalEmptyOption = new(default, "None (unknown)");
+
     private readonly Model model = new();
     private int hourPart;
     private int minutePart;
+    private int observedUntilHourPart = 12;
+    private int observedUntilMinutePart;
     private const long MaxPhotoUploadBytes = 25L * 1024L * 1024L;
     private readonly List<IBrowserFile> selectedPhotos = [];
     private string? uploadError;
@@ -247,6 +286,7 @@
         }
 
         LoadTimePartsFromModel();
+        LoadObservedUntilPartsFromModel();
     }
 
     private void LoadTimePartsFromModel()
@@ -259,6 +299,31 @@
 
     private void SyncModelTimeFromParts() =>
         model.OccurredAtLocalTime = $"{hourPart:D2}:{minutePart:D2}";
+
+    private void LoadObservedUntilPartsFromModel()
+    {
+        if (model.ObservedUntilLocalDate is null)
+        {
+            observedUntilHourPart = 12;
+            observedUntilMinutePart = 0;
+            model.ObservedUntilLocalTime = "12:00";
+            return;
+        }
+
+        if (!TimeOnly.TryParse(model.ObservedUntilLocalTime, out var t))
+            t = new TimeOnly(12, 0);
+        observedUntilHourPart = t.Hour;
+        observedUntilMinutePart = t.Minute;
+    }
+
+    private void SyncObservedUntilTimeFromParts() =>
+        model.ObservedUntilLocalTime = $"{observedUntilHourPart:D2}:{observedUntilMinutePart:D2}";
+
+    private Task OnObservedUntilDateChangedAsync()
+    {
+        LoadObservedUntilPartsFromModel();
+        return Task.CompletedTask;
+    }
 
     private async Task OnPhotosSelected(InputFileChangeEventArgs e)
     {
@@ -549,7 +614,9 @@
 
         public string? Notes { get; set; }
 
-        public DateTime? ObservedUntilLocal { get; set; }
+        public DateTime? ObservedUntilLocalDate { get; set; }
+
+        public string ObservedUntilLocalTime { get; set; } = "12:00";
 
         public DateTime GetOccurredAtUtc()
         {
@@ -570,10 +637,21 @@
 
         public DateTime? GetObservedUntilUtc()
         {
-            if (ObservedUntilLocal is null)
+            if (ObservedUntilLocalDate is null)
                 return null;
 
-            var local = DateTime.SpecifyKind(ObservedUntilLocal.Value, DateTimeKind.Local);
+            if (!TimeOnly.TryParse(ObservedUntilLocalTime, out var t))
+                t = new TimeOnly(12, 0);
+
+            var local = new DateTime(
+                ObservedUntilLocalDate.Value.Year,
+                ObservedUntilLocalDate.Value.Month,
+                ObservedUntilLocalDate.Value.Day,
+                t.Hour,
+                t.Minute,
+                0,
+                DateTimeKind.Local);
+
             return local.ToUniversalTime();
         }
     }

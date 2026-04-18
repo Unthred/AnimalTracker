@@ -10,7 +10,8 @@
             <NavMenu />
         </aside>
 
-        <main class="app-surface min-h-[50vh] min-w-0 overflow-hidden rounded-2xl border shadow-card dark:shadow-none">
+        @* overflow-y visible so position:fixed popovers anchor to the viewport; overflow-x hidden keeps horizontal clip *@
+        <main class="app-surface min-h-[50vh] min-w-0 overflow-x-hidden overflow-y-visible rounded-2xl border shadow-card dark:shadow-none">
             <CascadingValue Name="CompactUi" Value="Prefs.CompactMode">
                 <div class="@MainInnerClass">
                     @Body

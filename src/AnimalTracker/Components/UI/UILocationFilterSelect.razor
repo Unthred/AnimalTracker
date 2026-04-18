@@ -1,0 +1,30 @@
+@using AnimalTracker.Data.Entities
+
+<SearchableCombobox TValue="int?"
+                    Id="@Id"
+                    Items="@LocationOptions"
+                    EmptyRowWhenUnfiltered="@EmptyRow"
+                    Value="Value"
+                    ValueChanged="ValueChanged"
+                    Placeholder="@EmptyLabel"
+                    Disabled="@(Items.Count == 0)"
+                    NoResultsText="No locations found"
+                    AllowClear="true"
+                    ChevronAriaLabel="Show location options"
+                    Class="@Class"
+                    AdditionalAttributes="@AdditionalAttributes" />
+
+@code {
+    [Parameter] public string? Id { get; set; }
+    [Parameter] public IReadOnlyList<Location> Items { get; set; } = [];
+    [Parameter] public int? Value { get; set; }
+    [Parameter] public EventCallback<int?> ValueChanged { get; set; }
+    [Parameter] public string EmptyLabel { get; set; } = "All locations";
+    [Parameter] public string? Class { get; set; }
+    [Parameter(CaptureUnmatchedValues = true)] public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    private ComboboxOption<int?> EmptyRow => new(null, EmptyLabel);
+
+    private IReadOnlyList<ComboboxOption<int?>> LocationOptions =>
+        Items.Select(s => new ComboboxOption<int?>(s.Id, s.Name)).ToArray();
+}

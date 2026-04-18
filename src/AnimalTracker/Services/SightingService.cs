@@ -23,7 +23,8 @@ public sealed record SightingMapPoint(
     double Latitude,
     double Longitude,
     double? LocationAccuracyMeters,
-    SightingBehavior? Behavior);
+    SightingBehavior? Behavior,
+    int? PrimaryPhotoId);
 
 public sealed record AnimalTerritorySummary(
     int AnimalId,
@@ -239,7 +240,8 @@ public sealed class SightingService(ApplicationDbContext db, CurrentUserService 
                 x.Latitude!.Value,
                 x.Longitude!.Value,
                 x.LocationAccuracyMeters,
-                x.Behavior))
+                x.Behavior,
+                x.Photos.OrderBy(p => p.Id).Select(p => (int?)p.Id).FirstOrDefault()))
             .ToListAsync(cancellationToken);
     }
 
@@ -322,6 +324,7 @@ public sealed class SightingService(ApplicationDbContext db, CurrentUserService 
             .Include(x => x.Animal).ThenInclude(a => a!.Species)
             .Include(x => x.Species)
             .Include(x => x.Location)
+            .Include(x => x.Photos)
             .Where(x => x.OwnerUserId == userId && x.AnimalId == animalId);
 
         if (fromUtc is not null)
@@ -367,7 +370,8 @@ public sealed class SightingService(ApplicationDbContext db, CurrentUserService 
                 x.Latitude!.Value,
                 x.Longitude!.Value,
                 x.LocationAccuracyMeters,
-                x.Behavior))
+                x.Behavior,
+                x.Photos.Count == 0 ? null : (int?)x.Photos.OrderBy(p => p.Id).First().Id))
             .ToList();
 
         return new AnimalTerritoryInsights(

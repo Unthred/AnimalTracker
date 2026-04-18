@@ -21,55 +21,37 @@
     </Actions>
 </UIPageHeader>
 
-<UICard Class="mt-2">
+@* Stacking: this card is z-20 so it sits above the sightings list below. Inside the card all fields are z-auto; DOM order decides overlap — row 2 (From/To date, etc.) paints above row 1 (Species/Location/Animal) if they overlap. Open combobox list panels use a high z-index on the panel only (see SearchableCombobox). UIDatePicker popover uses its own high z when open. *@
+<UICard Class="relative z-20 mt-2">
     <div class="min-w-0 space-y-6">
         <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8 lg:grid-cols-3">
             <UIField Label="Species" For="species">
-                <input id="species"
-                       list="species-options"
-                       class="w-full min-w-0 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80"
-                       placeholder="All or type to filter"
-                       autocomplete="off"
-                       value="@selectedSpeciesName"
-                       @oninput="OnSpeciesInputAsync" />
-                <datalist id="species-options">
-                    @foreach (var s in species)
-                    {
-                        <option value="@s.Name"></option>
-                    }
-                </datalist>
+                <UISpeciesSelect id="species"
+                                 Items="species"
+                                 EmptyLabel="All"
+                                 @bind-Value="selectedSpeciesId"
+                                 @bind-Value:after="ScheduleReloadAsync" />
             </UIField>
 
             <UIField Label="Location" For="location">
-                <input id="location"
-                       list="location-options"
-                       class="w-full min-w-0 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80"
-                       placeholder="All or type to filter"
-                       autocomplete="off"
-                       value="@selectedLocationName"
-                       @oninput="OnLocationInputAsync" />
-                <datalist id="location-options">
-                    @foreach (var l in locations)
-                    {
-                        <option value="@l.Name"></option>
-                    }
-                </datalist>
+                <UILocationFilterSelect id="location"
+                                        Items="locations"
+                                        EmptyLabel="All"
+                                        @bind-Value="selectedLocationId"
+                                        @bind-Value:after="ScheduleReloadAsync" />
             </UIField>
 
             <UIField Label="Animal" For="animal">
-                <input id="animal"
-                       list="animal-options"
-                       class="w-full min-w-0 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80"
-                       placeholder="All or type to filter"
-                       autocomplete="off"
-                       value="@selectedAnimalLabel"
-                       @oninput="OnAnimalInputAsync" />
-                <datalist id="animal-options">
-                    @foreach (var a in animals)
-                    {
-                        <option value="@GetAnimalFilterLabel(a)"></option>
-                    }
-                </datalist>
+                <SearchableCombobox TValue="int?"
+                                    id="animal"
+                                    Items="@AnimalFilterOptions"
+                                    EmptyRowWhenUnfiltered="@AnimalEmptyOption"
+                                    @bind-Value="selectedAnimalId"
+                                    @bind-Value:after="ScheduleReloadAsync"
+                                    Placeholder="All animals"
+                                    NoResultsText="No animals found"
+                                    AllowClear="true"
+                                    ChevronAriaLabel="Show animals" />
             </UIField>
         </div>
 
@@ -190,9 +172,6 @@
     private List<Sighting> sightings = [];
     private CancellationTokenSource? filterDebounceCts;
 
-    private string? selectedSpeciesName;
-    private string? selectedLocationName;
-    private string? selectedAnimalLabel;
     private int? selectedSpeciesId;
     private int? selectedLocationId;
     private int? selectedAnimalId;
@@ -219,6 +198,11 @@
     {
         species = await Species.GetAllAsync();
         locations = await Locations.GetAllAsync();
+        if (locations.Count == 0)
+        {
+            await Locations.GetOrCreateDefaultAsync();
+            locations = await Locations.GetAllAsync();
+        }
         animals = await Animals.SearchAsync(query: null, speciesId: null);
         await ReloadAsync();
     }
@@ -226,9 +210,6 @@
     private async Task ReloadAsync()
     {
         loading = true;
-        selectedSpeciesId = ResolveSpeciesId(selectedSpeciesName);
-        selectedLocationId = ResolveLocationId(selectedLocationName);
-        selectedAnimalId = ResolveAnimalId(selectedAnimalLabel);
 
         DateTime? fromUtc = fromLocalDate.HasValue
             ? DateTime.SpecifyKind(fromLocalDate.Value.Date, DateTimeKind.Local).ToUniversalTime()
@@ -251,55 +232,12 @@
         loading = false;
     }
 
-    private int? ResolveSpeciesId(string? speciesName)
-    {
-        var name = (speciesName ?? "").Trim();
-        if (string.IsNullOrWhiteSpace(name))
-            return null;
+    private ComboboxOption<int?> AnimalEmptyOption => new(null, "All animals");
 
-        return species.FirstOrDefault(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase))?.Id;
-    }
-
-    private int? ResolveLocationId(string? locationName)
-    {
-        var name = (locationName ?? "").Trim();
-        if (string.IsNullOrWhiteSpace(name))
-            return null;
-
-        return locations.FirstOrDefault(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase))?.Id;
-    }
-
-    private int? ResolveAnimalId(string? animalLabel)
-    {
-        var label = (animalLabel ?? "").Trim();
-        if (string.IsNullOrWhiteSpace(label))
-            return null;
-
-        var byDisplay = animals.FirstOrDefault(x =>
-            string.Equals(GetAnimalFilterLabel(x), label, StringComparison.OrdinalIgnoreCase));
-        if (byDisplay is not null)
-            return byDisplay.Id;
-
-        return null;
-    }
-
-    private async Task OnSpeciesInputAsync(ChangeEventArgs e)
-    {
-        selectedSpeciesName = e.Value?.ToString();
-        await ScheduleReloadAsync();
-    }
-
-    private async Task OnLocationInputAsync(ChangeEventArgs e)
-    {
-        selectedLocationName = e.Value?.ToString();
-        await ScheduleReloadAsync();
-    }
-
-    private async Task OnAnimalInputAsync(ChangeEventArgs e)
-    {
-        selectedAnimalLabel = e.Value?.ToString();
-        await ScheduleReloadAsync();
-    }
+    private IReadOnlyList<ComboboxOption<int?>> AnimalFilterOptions =>
+        animals
+            .Select(a => new ComboboxOption<int?>(a.Id, GetAnimalFilterLabel(a)))
+            .ToArray();
 
     private Task OnFiltersChangedAsync() => ScheduleReloadAsync();
 

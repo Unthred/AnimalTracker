@@ -250,7 +250,7 @@
   input[type="datetime-local"],
   textarea,
   select {
-    @apply rounded-xl border border-slate-200/90 bg-white text-slate-900 shadow-sm transition duration-200 ease-in-out;
+    @apply rounded-xl border border-slate-200/90 bg-white text-sm font-semibold text-slate-900 shadow-sm transition duration-200 ease-in-out;
     @apply hover:border-slate-300 hover:shadow-sm;
     @apply focus:border-slate-300 focus:ring-4 focus:ring-slate-200/70;
     @apply dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80;
@@ -323,6 +323,27 @@
 
   table.table td {
     @apply border-b border-slate-200 px-3 py-2 text-sm text-slate-700;
+  }
+
+  /* Leaflet map: sighting pins — JS sets all dimensions per zoom (see wwwroot/js/sightings-map.js). */
+  .leaflet-container .leaflet-marker-icon.leaflet-div-icon.at-map-thumb-marker {
+    background: transparent !important;
+    border: none !important;
+    overflow: hidden !important;
+  }
+
+  .leaflet-container .at-map-thumb-wrap {
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+
+  html.dark .leaflet-container .at-map-thumb-wrap {
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.55);
+  }
+
+  .leaflet-container .at-map-thumb-wrap img {
+    object-fit: cover;
+    display: block;
   }
 }
 

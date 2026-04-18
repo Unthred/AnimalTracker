@@ -15,13 +15,11 @@
 
 <PageTitle>Import photos</PageTitle>
 
-<UIPageHeader Title="Import photos" Description="Upload a folder or multiple images. Bursts are merged into one sighting when time and GPS match your settings." />
-
-<div class="mb-4">
-    <span class="inline-flex items-center rounded-full border border-slate-200/90 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
-        Species region: @(string.IsNullOrWhiteSpace(activeSpeciesRegionName) ? "Not selected" : activeSpeciesRegionName)
-    </span>
-</div>
+<UIPageHeader Title="Import photos" Description="Upload a folder or multiple images. Bursts are merged into one sighting when time and GPS match your settings.">
+    <Actions>
+        <UISpeciesRegionBadge RegionName="@activeSpeciesRegionName" />
+    </Actions>
+</UIPageHeader>
 
 <UICard>
     <EditForm Model="model" OnValidSubmit="SubmitAsync" class="space-y-6">
@@ -36,28 +34,17 @@
 
         <div class="grid min-w-0 grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8">
             <UIField Label="Fallback species" For="fallback" Hint="Used when recognition is off or confidence is low.">
-                <select id="fallback" class="w-full min-w-0 px-3 py-2.5" value="@(model.FallbackSpeciesId?.ToString() ?? "")" @onchange="OnFallbackSpeciesChange">
-                    <option value="">None (strict — requires recognition match)</option>
-                    @foreach (var s in species)
-                    {
-                        <option value="@s.Id">@s.Name</option>
-                    }
-                </select>
+                <UISpeciesSelect id="fallback"
+                                 Items="species"
+                                 EmptyLabel="Select species..."
+                                 @bind-Value="model.FallbackSpeciesId" />
             </UIField>
 
             <UIField Label="Location" For="location">
-                <InputText id="location"
-                           list="location-options"
-                           class="w-full min-w-0 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50"
-                           placeholder="Default or existing location name"
-                           autocomplete="off"
-                           @bind-Value="model.LocationName" />
-                <datalist id="location-options">
-                    @foreach (var l in locations)
-                    {
-                        <option value="@l.Name"></option>
-                    }
-                </datalist>
+                <UILocationNameCombobox id="location"
+                                        Items="locations"
+                                        Placeholder="Select or type location..."
+                                        @bind-Value="model.LocationName" />
             </UIField>
         </div>
 
@@ -126,18 +113,6 @@
         selectedFiles.AddRange(e.GetMultipleFiles());
         result = null;
         errorMessage = null;
-    }
-
-    private void OnFallbackSpeciesChange(ChangeEventArgs e)
-    {
-        var v = e.Value?.ToString();
-        if (string.IsNullOrWhiteSpace(v))
-        {
-            model.FallbackSpeciesId = null;
-            return;
-        }
-
-        model.FallbackSpeciesId = int.TryParse(v, out var id) ? id : null;
     }
 
     private async Task SubmitAsync()

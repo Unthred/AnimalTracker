@@ -1,7 +1,7 @@
 <div class="@OuterClass">
     @if (Label is not null)
     {
-        <label class="block text-sm font-medium text-slate-700 dark:text-slate-200" for="@For">@Label</label>
+        <label class="@LabelClassCombined" for="@For">@Label</label>
     }
     <div class="@(Label is not null ? "mt-2" : "")">
         @ChildContent
@@ -14,10 +14,16 @@
 
 @code {
     [Parameter] public string? Label { get; set; }
+    /// <summary>Optional extra label classes (e.g. font-semibold). When set, replaces default font-medium.</summary>
+    [Parameter] public string? LabelClass { get; set; }
     [Parameter] public string? For { get; set; }
     [Parameter] public string? Hint { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }
     [Parameter] public string? Class { get; set; }
 
     private string OuterClass => string.Join(' ', new[] { Class }.Where(s => !string.IsNullOrWhiteSpace(s)));
+
+    private string LabelClassCombined => string.IsNullOrWhiteSpace(LabelClass)
+        ? "block text-sm font-medium text-slate-700 dark:text-slate-200"
+        : $"block text-sm text-slate-700 dark:text-slate-200 {LabelClass}";
 }

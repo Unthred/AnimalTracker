@@ -15,48 +15,41 @@
 
 <UIPageHeader Title="Sightings map" Description="Explore sightings and territory overlays from geotagged observations." />
 
-<UICard Class="mt-2">
+<UICard Class="relative z-20 mt-2">
     <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <UIField Label="Species" For="species">
-            <input id="species"
-                   list="species-options"
-                   class="w-full min-w-0 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80"
-                   placeholder="All species"
-                   autocomplete="off"
-                   value="@selectedSpeciesName"
-                   @oninput="OnSpeciesInputAsync" />
-            <datalist id="species-options">
-                @foreach (var s in species)
-                {
-                    <option value="@s.Name"></option>
-                }
-            </datalist>
+            <UISpeciesSelect id="species"
+                             Items="species"
+                             EmptyLabel="All"
+                             @bind-Value="selectedSpeciesId"
+                             @bind-Value:after="ReloadAsync" />
         </UIField>
         <UIField Label="Animal" For="animal">
-            <input id="animal"
-                   list="animal-options"
-                   class="w-full min-w-0 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80"
-                   placeholder="All animals"
-                   autocomplete="off"
-                   value="@selectedAnimalLabel"
-                   @oninput="OnAnimalInputAsync" />
-            <datalist id="animal-options">
-                @foreach (var a in animals)
-                {
-                    <option value="@GetAnimalFilterLabel(a)"></option>
-                }
-            </datalist>
+            <SearchableCombobox TValue="int?"
+                                id="animal"
+                                Items="@AnimalFilterOptions"
+                                EmptyRowWhenUnfiltered="@AnimalEmptyOption"
+                                @bind-Value="selectedAnimalId"
+                                @bind-Value:after="ReloadAsync"
+                                Placeholder="All animals"
+                                NoResultsText="No animals found"
+                                AllowClear="true"
+                                ChevronAriaLabel="Show animals" />
         </UIField>
         <UIField Label="From date" For="fromDate">
-            <InputDate id="fromDate" class="w-full min-w-0 px-3 py-2.5" @bind-Value="fromLocalDate" @bind-Value:after="ReloadAsync" />
+            <UIDatePicker id="fromDate"
+                          @bind-NullableValue="fromLocalDate"
+                          @bind-NullableValue:after="ReloadAsync" />
         </UIField>
         <UIField Label="To date" For="toDate">
-            <InputDate id="toDate" class="w-full min-w-0 px-3 py-2.5" @bind-Value="toLocalDate" @bind-Value:after="ReloadAsync" />
+            <UIDatePicker id="toDate"
+                          @bind-NullableValue="toLocalDate"
+                          @bind-NullableValue:after="ReloadAsync" />
         </UIField>
     </div>
 </UICard>
 
-<UICard Class="mt-6">
+<UICard Class="relative z-0 mt-6">
     <div class="mb-4 flex flex-wrap items-center gap-4 text-sm text-slate-600 dark:text-slate-300">
         <span>@points.Count geotagged sightings</span>
         <span>@territories.Count inferred territories</span>
@@ -87,8 +80,8 @@
     private List<Animal> animals = [];
     private List<SightingMapPoint> points = [];
     private List<AnimalTerritorySummary> territories = [];
-    private string? selectedSpeciesName;
-    private string? selectedAnimalLabel;
+    private int? selectedSpeciesId;
+    private int? selectedAnimalId;
     private DateTime? fromLocalDate;
     private DateTime? toLocalDate;
     private bool shouldRenderMap;
@@ -121,9 +114,9 @@
         var filters = new SightingFilters(
             FromUtc: fromUtc,
             ToUtc: toUtc,
-            SpeciesId: ResolveSpeciesId(selectedSpeciesName),
+            SpeciesId: selectedSpeciesId,
             LocationId: null,
-            AnimalId: ResolveAnimalId(selectedAnimalLabel),
+            AnimalId: selectedAnimalId,
             UnknownOnly: false,
             WithCoordinatesOnly: true,
             MaxLocationAccuracyMeters: null);
@@ -134,36 +127,12 @@
         await InvokeAsync(StateHasChanged);
     }
 
-    private async Task OnSpeciesInputAsync(ChangeEventArgs e)
-    {
-        selectedSpeciesName = e.Value?.ToString();
-        await ReloadAsync();
-    }
+    private ComboboxOption<int?> AnimalEmptyOption => new(null, "All animals");
 
-    private async Task OnAnimalInputAsync(ChangeEventArgs e)
-    {
-        selectedAnimalLabel = e.Value?.ToString();
-        await ReloadAsync();
-    }
-
-    private int? ResolveSpeciesId(string? name)
-    {
-        var trimmed = (name ?? "").Trim();
-        if (string.IsNullOrWhiteSpace(trimmed))
-            return null;
-
-        return species.FirstOrDefault(x => string.Equals(x.Name, trimmed, StringComparison.OrdinalIgnoreCase))?.Id;
-    }
-
-    private int? ResolveAnimalId(string? animalLabel)
-    {
-        var trimmed = (animalLabel ?? "").Trim();
-        if (string.IsNullOrWhiteSpace(trimmed))
-            return null;
-
-        return animals.FirstOrDefault(x =>
-            string.Equals(GetAnimalFilterLabel(x), trimmed, StringComparison.OrdinalIgnoreCase))?.Id;
-    }
+    private IReadOnlyList<ComboboxOption<int?>> AnimalFilterOptions =>
+        animals
+            .Select(a => new ComboboxOption<int?>(a.Id, GetAnimalFilterLabel(a)))
+            .ToArray();
 
     private static string GetAnimalFilterLabel(Animal a) =>
         !string.IsNullOrWhiteSpace(a.DisplayName) ? a.DisplayName : $"Animal #{a.Id} · {a.Species.Name}";

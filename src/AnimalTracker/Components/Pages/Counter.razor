@@ -21,13 +21,17 @@
     </Actions>
 </UIPageHeader>
 
-<UICard Class="mt-2">
+<UICard Class="relative z-20 mt-2">
     <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
         <UIField Label="From date" For="fromDate">
-            <InputDate id="fromDate" class="w-full min-w-0 px-3 py-2.5" @bind-Value="fromLocalDate" @bind-Value:after="ReloadAsync" />
+            <UIDatePicker id="fromDate"
+                          @bind-NullableValue="fromLocalDate"
+                          @bind-NullableValue:after="ReloadAsync" />
         </UIField>
         <UIField Label="To date" For="toDate">
-            <InputDate id="toDate" class="w-full min-w-0 px-3 py-2.5" @bind-Value="toLocalDate" @bind-Value:after="ReloadAsync" />
+            <UIDatePicker id="toDate"
+                          @bind-NullableValue="toLocalDate"
+                          @bind-NullableValue:after="ReloadAsync" />
         </UIField>
     </div>
 </UICard>
@@ -64,31 +68,26 @@ else
     @if (summary.TotalSightings > 0)
     {
         <UICard Title="Coverage" Class="mt-6">
-            <div class="grid gap-8 lg:grid-cols-2 lg:items-center">
-                <div class="space-y-5">
-                    <div>
-                        <div class="mb-2 flex items-center justify-between text-xs font-medium text-slate-600 dark:text-slate-400">
-                            <span>Geotagged share</span>
-                            <span class="tabular-nums text-slate-900 dark:text-slate-100">@PercentOf(summary.GeotaggedSightings, summary.TotalSightings)%</span>
-                        </div>
-                        <div class="h-3 overflow-hidden rounded-full bg-slate-200/90 dark:bg-slate-700/90">
-                            <div class="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-[width] duration-500"
-                                 style="width: @(PercentOf(summary.GeotaggedSightings, summary.TotalSightings))%"></div>
-                        </div>
+            <div class="max-w-xl space-y-5">
+                <div>
+                    <div class="mb-2 flex items-center justify-between text-xs font-medium text-slate-600 dark:text-slate-400">
+                        <span>Geotagged share</span>
+                        <span class="tabular-nums text-slate-900 dark:text-slate-100">@PercentOf(summary.GeotaggedSightings, summary.TotalSightings)%</span>
                     </div>
-                    <div>
-                        <div class="mb-2 flex items-center justify-between text-xs font-medium text-slate-600 dark:text-slate-400">
-                            <span>Linked to animals</span>
-                            <span class="tabular-nums text-slate-900 dark:text-slate-100">@PercentOf(summary.LinkedAnimalSightings, summary.TotalSightings)%</span>
-                        </div>
-                        <div class="h-3 overflow-hidden rounded-full bg-slate-200/90 dark:bg-slate-700/90">
-                            <div class="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-500 transition-[width] duration-500"
-                                 style="width: @(PercentOf(summary.LinkedAnimalSightings, summary.TotalSightings))%"></div>
-                        </div>
+                    <div class="h-3 overflow-hidden rounded-full bg-slate-200/90 dark:bg-slate-700/90">
+                        <div class="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-[width] duration-500"
+                             style="width: @(PercentOf(summary.GeotaggedSightings, summary.TotalSightings))%"></div>
                     </div>
                 </div>
-                <div class="relative mx-auto h-56 w-full max-w-sm">
-                    <canvas id="@IdCoverage"></canvas>
+                <div>
+                    <div class="mb-2 flex items-center justify-between text-xs font-medium text-slate-600 dark:text-slate-400">
+                        <span>Linked to animals</span>
+                        <span class="tabular-nums text-slate-900 dark:text-slate-100">@PercentOf(summary.LinkedAnimalSightings, summary.TotalSightings)%</span>
+                    </div>
+                    <div class="h-3 overflow-hidden rounded-full bg-slate-200/90 dark:bg-slate-700/90">
+                        <div class="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-500 transition-[width] duration-500"
+                             style="width: @(PercentOf(summary.LinkedAnimalSightings, summary.TotalSightings))%"></div>
+                    </div>
                 </div>
             </div>
         </UICard>
@@ -229,7 +228,6 @@ else
     private string IdSpecies => $"stats-sp-{_chartUid}";
     private string IdDaily => $"stats-daily-{_chartUid}";
     private string IdBehavior => $"stats-beh-{_chartUid}";
-    private string IdCoverage => $"stats-cov-{_chartUid}";
 
     private bool loading = true;
     private bool chartsDirty;
@@ -328,7 +326,7 @@ else
     {
         try
         {
-            foreach (var id in new[] { IdSpecies, IdDaily, IdBehavior, IdCoverage })
+            foreach (var id in new[] { IdSpecies, IdDaily, IdBehavior })
                 await JS.InvokeVoidAsync("animalTrackerStatsChartsDestroy", id);
         }
         catch
@@ -367,17 +365,6 @@ else
                 IdBehavior,
                 summary.BehaviorCounts.Select(b => b.Behavior.ToString()).ToArray(),
                 summary.BehaviorCounts.Select(b => b.Count).ToArray());
-        }
-
-        if (summary.TotalSightings > 0)
-        {
-            var gt = summary.GeotaggedSightings;
-            var ng = Math.Max(0, summary.TotalSightings - gt);
-            await JS.InvokeVoidAsync(
-                "animalTrackerStatsChartsDoughnut",
-                IdCoverage,
-                new[] { "Geotagged", "Not geotagged" },
-                new[] { gt, ng });
         }
     }
 

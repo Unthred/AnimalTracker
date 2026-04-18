@@ -41,7 +41,8 @@
 
     private string ComputedClass => string.Join(' ', new[]
     {
-        "app-surface overflow-hidden rounded-2xl border shadow-card dark:shadow-none",
+        // overflow-visible so popovers (date picker, combobox lists) are not clipped by the card.
+        "app-surface overflow-visible rounded-2xl border shadow-card dark:shadow-none",
         Class
     }.Where(s => !string.IsNullOrWhiteSpace(s)));
 }

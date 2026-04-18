@@ -30,8 +30,8 @@
     private string OuterClass => string.Join(' ', new[]
     {
         CompactUi
-            ? "mb-5 flex flex-col gap-4 sm:mb-6 sm:flex-row sm:items-start sm:justify-between"
-            : "mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between",
+            ? "mb-5 flex flex-col gap-4 sm:mb-6 sm:flex-row sm:items-center sm:justify-between"
+            : "mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between",
         Class
     }.Where(s => !string.IsNullOrWhiteSpace(s)));
 }

@@ -6,6 +6,7 @@
 @attribute [Authorize]
 
 @using AnimalTracker.Services
+@using AnimalTracker.Components.UI
 @using Microsoft.AspNetCore.Components.Forms
 @inject UserSettingsService Settings
 @inject AppSettingsService AppSettings
@@ -52,24 +53,27 @@
             </UIField>
 
             <UIField Label="Timeline page size" For="pageSize">
-                <select id="pageSize" class="w-full min-w-0 px-3 py-2.5"
-                        @bind="model.TimelinePageSize"
-                        @bind:after="OnPreferencesChangedAsync">
-                    <option value="25">25</option>
-                    <option value="50">50</option>
-                    <option value="100">100</option>
-                </select>
+                <SearchableCombobox TValue="int"
+                                    Id="pageSize"
+                                    Items="@ComboboxOptionList.TimelinePageSizes"
+                                    @bind-Value="model.TimelinePageSize"
+                                    @bind-Value:after="OnPreferencesChangedAsync"
+                                    Placeholder="Timeline page size"
+                                    ChevronAriaLabel="Timeline page size options"
+                                    NoResultsText="No options" />
             </UIField>
         </div>
 
         <UIField Label="Theme" For="themeMode" Hint="Choose Light, Dark, or follow your system setting.">
-            <select id="themeMode" class="w-full max-w-xs min-w-0 px-3 py-2.5"
-                    value="@model.ThemeMode"
-                    @onchange="OnThemeModeChangedAsync">
-                <option value="system">Follow system</option>
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
-            </select>
+            <SearchableCombobox TValue="string"
+                                Id="themeMode"
+                                Items="@ComboboxOptionList.UserThemeModes"
+                                Value="@model.ThemeMode"
+                                ValueChanged="OnThemeModeValueChangedAsync"
+                                Placeholder="Theme"
+                                ChevronAriaLabel="Theme options"
+                                NoResultsText="No options"
+                                Class="max-w-xs" />
         </UIField>
 
         <UIField Label="Panel opacity" For="surfaceOpacity"
@@ -298,9 +302,9 @@
         hasActiveSpeciesRegion = !string.IsNullOrWhiteSpace(app.ActiveSpeciesRegionKey);
     }
 
-    private async Task OnThemeModeChangedAsync(ChangeEventArgs e)
+    private async Task OnThemeModeValueChangedAsync(string value)
     {
-        model.ThemeMode = NormalizeThemeMode(e.Value?.ToString());
+        model.ThemeMode = NormalizeThemeMode(value);
         Prefs.SetThemeMode(model.ThemeMode);
 
         try

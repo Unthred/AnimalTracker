@@ -1,14 +1,16 @@
 @using System.Globalization
+@inject IJSRuntime JS
 
-<div class="relative" @onkeydown="OnKeyDown">
+<div class="@RootClass" @onkeydown="OnKeyDown">
     <div class="relative">
         <button type="button"
+                @ref="_buttonRef"
                 class="@InputClass"
                 aria-haspopup="dialog"
                 aria-expanded="@(open ? "true" : "false")"
                 @attributes="AdditionalAttributes"
                 @onclick="Toggle">
-            <span class="min-w-0 truncate text-left">@DisplayText</span>
+            <span class="min-w-0 truncate text-left @DateButtonTextClass">@DisplayText</span>
 
             <span class="ml-2 flex shrink-0 items-center text-slate-400 dark:text-slate-500">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4">
@@ -20,11 +22,12 @@
 
     @if (open)
     {
-        <div class="fixed inset-0 z-40" @onclick="Close">
+        <div class="fixed inset-0 z-[199900]" @onclick="Close">
             <div class="absolute inset-0 bg-black/20"></div>
         </div>
 
-        <div class="absolute z-50 mt-2 w-[20rem] overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xl dark:border-slate-800/80 dark:bg-slate-900"
+        <div @ref="_panelRef"
+             class="absolute left-0 top-[calc(100%+4px)] z-[200000] w-[20rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xl dark:border-slate-800/80 dark:bg-slate-900"
              role="dialog"
              aria-label="Choose date">
             <div class="flex items-center justify-between gap-2 border-b border-slate-200/80 px-4 py-3 dark:border-slate-800/80">
@@ -89,6 +92,9 @@
     [Parameter] public EventCallback<DateTime?> NullableValueChanged { get; set; }
     [Parameter(CaptureUnmatchedValues = true)] public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
 
+    private ElementReference _buttonRef;
+    private ElementReference _panelRef;
+
     private bool open;
     private DateTime cursorMonth;
     private string textValue = "";
@@ -114,12 +120,35 @@
         cursorMonth = new DateTime(EffectiveValue.Year, EffectiveValue.Month, 1);
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!open)
+            return;
+
+        try
+        {
+            await JS.InvokeVoidAsync("animalTrackerAnchorFixedBelow", _buttonRef, _panelRef, 4, false);
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch
+        {
+        }
+    }
+
     private string DisplayText => string.IsNullOrWhiteSpace(textValue) ? Placeholder : textValue;
+
+    private string DateButtonTextClass => string.IsNullOrWhiteSpace(textValue)
+        ? "font-normal text-slate-400 dark:text-slate-500"
+        : "font-semibold text-slate-900 dark:text-slate-50";
+
+    private string RootClass => "relative min-w-0";
 
     private string InputClass => string.Join(' ', new[]
     {
         "flex w-full min-w-0 items-center justify-between rounded-xl border px-3 py-2.5 text-sm shadow-sm transition duration-200 ease-in-out",
-        "border-slate-200/90 bg-white text-slate-900 hover:border-slate-300 hover:shadow-sm",
+        "border-slate-200/90 bg-white hover:border-slate-300 hover:shadow-sm",
         "focus:outline-none focus-visible:ring-4 focus-visible:ring-slate-200/70",
         "dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus-visible:ring-slate-800/80",
         "text-left",

@@ -6,6 +6,7 @@
 @attribute [Authorize]
 
 @using AnimalTracker.Services
+@using AnimalTracker.Components.UI
 @using Microsoft.AspNetCore.Components.Forms
 @inject AdminUserService AdminUsers
 @inject AppSettingsService AppSettings
@@ -74,11 +75,14 @@
         <div>
             <EditForm Model="model" OnValidSubmit="SaveThemeAsync" class="space-y-5">
                 <UIField Label="Default theme" For="themeMode" Hint="Used for login/register and as initial preference for new user accounts.">
-                    <select id="themeMode" class="w-full max-w-xs min-w-0 px-3 py-2.5" @bind="model.DefaultThemeMode">
-                        <option value="system">Follow system</option>
-                        <option value="light">Light</option>
-                        <option value="dark">Dark</option>
-                    </select>
+                    <SearchableCombobox TValue="string"
+                                        Id="themeMode"
+                                        Items="@ComboboxOptionList.UserThemeModes"
+                                        @bind-Value="model.DefaultThemeMode"
+                                        Placeholder="Default theme"
+                                        ChevronAriaLabel="Default theme options"
+                                        NoResultsText="No options"
+                                        Class="max-w-xs" />
                 </UIField>
                 <div class="flex justify-stretch border-t border-slate-200/80 pt-5 dark:border-slate-800/80 sm:justify-end">
                     <UIButton Type="submit" Variant="UiButtonVariant.Primary" Class="w-full sm:w-auto">Save theme</UIButton>

@@ -1,0 +1,383 @@
+@typeparam TValue
+@using System.Linq
+@inject IJSRuntime JS
+
+<div class="@(WrapperClass ?? "")">
+    <div class="relative min-w-0">
+        @* Class (e.g. max-w-xs) applies to this wrapper so the chevron stays inside the same box as the input. *@
+        <div class="@TriggerClassCombined">
+            <input @ref="_inputRef"
+                   id="@Id"
+                   type="text"
+                   class="@ComboboxStyles.Input"
+                   data-app-combobox-input
+                   role="combobox"
+                   aria-expanded="@(open ? "true" : "false")"
+                   aria-autocomplete="list"
+                   aria-controls="@_listboxId"
+                   placeholder="@Placeholder"
+                   autocomplete="off"
+                   disabled="@IsEffectivelyDisabled"
+                   value="@text"
+                   @oninput="OnInputAsync"
+                   @onblur="OnBlurAsync"
+                   @onclick="OnInputClick"
+                   @onkeydown="OnInputKeyDownAsync"
+                   @attributes="AdditionalAttributes" />
+
+            @if (AllowClear && !IsEffectivelyDisabled && !string.IsNullOrWhiteSpace(text))
+            {
+                <button type="button"
+                        class="@ComboboxStyles.ClearButton"
+                        aria-label="Clear selection"
+                        tabindex="-1"
+                        @onclick="ClearAsync"
+                        @onmousedown:preventDefault="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4 shrink-0">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M18 6 6 18M6 6l12 12" />
+                    </svg>
+                </button>
+            }
+
+            <button type="button"
+                    class="@ChevronClassCombined"
+                    aria-label="@ChevronAriaLabel"
+                    tabindex="-1"
+                    disabled="@IsEffectivelyDisabled"
+                    @onclick="ToggleDropdownAsync"
+                    @onmousedown:preventDefault="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4 shrink-0">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m19 9-7 7-7-7" />
+                </svg>
+            </button>
+        </div>
+
+        @if (open && !IsEffectivelyDisabled)
+        {
+            <ul @ref="_listRef"
+                id="@_listboxId"
+                role="listbox"
+                class="@ComboboxStyles.Listbox">
+                @for (var i = 0; i < _visibleOptions.Count; i++)
+                {
+                    var opt = _visibleOptions[i];
+                    var idx = i;
+                    var selected = IsSelected(opt.Value);
+                    var highlighted = HighlightIndex == idx;
+                    <li role="option"
+                        aria-selected="@(selected ? "true" : "false")"
+                        class="@ComboboxStyles.OptionRow(highlighted, selected)"
+                        @onmousedown:preventDefault="true"
+                        @onmousedown="() => SelectAsync(opt)">
+                        @opt.Text
+                    </li>
+                }
+                @if (_visibleOptions.Count == 0)
+                {
+                    <li class="@ComboboxStyles.EmptyListHint">@ResolvedNoResultsText</li>
+                }
+            </ul>
+        }
+    </div>
+    @if (Footer is not null)
+    {
+        @Footer
+    }
+</div>
+
+@code {
+    [Parameter] public string? Id { get; set; }
+    [Parameter] public IReadOnlyList<ComboboxOption<TValue>> Items { get; set; } = [];
+    /// <summary>When set, this row is shown only while the filter text is empty (e.g. "All", "Select..."). Hidden while typing.</summary>
+    [Parameter] public ComboboxOption<TValue>? EmptyRowWhenUnfiltered { get; set; }
+    [Parameter] public TValue Value { get; set; } = default!;
+    [Parameter] public EventCallback<TValue> ValueChanged { get; set; }
+    [Parameter] public string Placeholder { get; set; } = "";
+    [Parameter] public bool Disabled { get; set; }
+    /// <summary>If true, TValue must be <see cref="string"/>; free text on blur is committed when it does not match an option.</summary>
+    [Parameter] public bool AllowCustomValue { get; set; }
+    [Parameter] public bool AllowClear { get; set; }
+    [Parameter] public string? NoResultsText { get; set; }
+    [Parameter] public string ChevronAriaLabel { get; set; } = "Open options";
+    [Parameter] public string? Class { get; set; }
+    /// <summary>Optional wrapper classes around the control + footer (e.g. <c>min-w-0 space-y-2</c>).</summary>
+    [Parameter] public string? WrapperClass { get; set; }
+    [Parameter] public RenderFragment? Footer { get; set; }
+    [Parameter(CaptureUnmatchedValues = true)] public IReadOnlyDictionary<string, object>? AdditionalAttributes { get; set; }
+
+    private readonly string _listboxId = $"combo-{Guid.NewGuid():n}";
+    private ElementReference _inputRef;
+    private ElementReference _listRef;
+    private string text = "";
+    private bool open;
+    private int HighlightIndex = -1;
+    /// <summary>True after the user has typed/edited; until then the list uses no filter so committed labels are not treated as search text.</summary>
+    private bool filterEditing;
+    private List<ComboboxOption<TValue>> _visibleOptions = [];
+
+    private static bool IsStringValueType => typeof(TValue) == typeof(string);
+
+    private bool IsEffectivelyDisabled => Disabled || (!AllowCustomValue && Items.Count == 0 && EmptyRowWhenUnfiltered is null);
+
+    private string FilterTrimmed => text.Trim();
+
+    /// <summary>Filter applied to the option list; empty until the user types so placeholder/selected labels are not used as search queries.</summary>
+    private string EffectiveFilter => filterEditing ? FilterTrimmed : "";
+
+    private string ResolvedNoResultsText => string.IsNullOrWhiteSpace(NoResultsText)
+        ? "No results found"
+        : NoResultsText!;
+
+    private string TriggerClassCombined => string.IsNullOrWhiteSpace(Class)
+        ? "relative w-full min-w-0"
+        : $"relative w-full min-w-0 {Class}";
+
+    private string ChevronClassCombined => ComboboxStyles.Chevron;
+
+    protected override void OnParametersSet()
+    {
+        if (!open)
+        {
+            filterEditing = false;
+            text = FormatDisplayFromValue();
+        }
+
+        RebuildVisibleOptions();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (IsEffectivelyDisabled || !open)
+            return;
+
+        try
+        {
+            await JS.InvokeVoidAsync("animalTrackerAnchorFixedBelow", _inputRef, _listRef, 4);
+        }
+        catch (JSDisconnectedException)
+        {
+            // ignore
+        }
+        catch
+        {
+            // ignore (prerender / test host without JS)
+        }
+    }
+
+    private bool ValuesEqual(TValue? a, TValue? b) =>
+        EqualityComparer<TValue>.Default.Equals(a!, b!);
+
+    private bool IsSelected(TValue optionValue) => ValuesEqual(Value, optionValue);
+
+    private IEnumerable<ComboboxOption<TValue>> AllOptionsForTextMatch()
+    {
+        if (EmptyRowWhenUnfiltered is { } e)
+            yield return e;
+        foreach (var i in Items)
+            yield return i;
+    }
+
+    private string FormatDisplayFromValue()
+    {
+        foreach (var o in Items)
+        {
+            if (ValuesEqual(Value, o.Value))
+                return o.Text;
+        }
+
+        if (AllowCustomValue && IsStringValueType && Value is string s)
+            return s;
+
+        return "";
+    }
+
+    private void RebuildVisibleOptions()
+    {
+        IEnumerable<ComboboxOption<TValue>> source;
+        if (EmptyRowWhenUnfiltered is { } emptyRow && string.IsNullOrWhiteSpace(EffectiveFilter))
+            source = new[] { emptyRow }.Concat(Items);
+        else
+            source = Items;
+
+        if (!string.IsNullOrWhiteSpace(EffectiveFilter))
+            source = source.Where(o => o.Text.Contains(EffectiveFilter, StringComparison.OrdinalIgnoreCase));
+
+        _visibleOptions = source.ToList();
+        if (_visibleOptions.Count == 0)
+            HighlightIndex = -1;
+        else if (HighlightIndex >= _visibleOptions.Count)
+            HighlightIndex = _visibleOptions.Count - 1;
+    }
+
+    /// <summary>Toggle list: click when open closes; click when closed opens. Typing still opens via <see cref="OnInputAsync"/>.</summary>
+    private void OnInputClick()
+    {
+        if (IsEffectivelyDisabled)
+            return;
+
+        if (open)
+        {
+            open = false;
+            HighlightIndex = -1;
+            return;
+        }
+
+        open = true;
+        filterEditing = false;
+        RebuildVisibleOptions();
+        ResetHighlight();
+    }
+
+    private async Task ToggleDropdownAsync()
+    {
+        if (IsEffectivelyDisabled)
+            return;
+
+        open = !open;
+        if (open)
+        {
+            filterEditing = false;
+            RebuildVisibleOptions();
+            ResetHighlight();
+            await _inputRef.FocusAsync();
+        }
+    }
+
+    private Task OnInputAsync(ChangeEventArgs e)
+    {
+        filterEditing = true;
+        text = e.Value?.ToString() ?? "";
+        open = true;
+        RebuildVisibleOptions();
+        ResetHighlight();
+        return Task.CompletedTask;
+    }
+
+    private async Task OnBlurAsync()
+    {
+        await Task.Delay(180);
+        open = false;
+        filterEditing = false;
+        await SyncTextToValueAsync();
+        RebuildVisibleOptions();
+        StateHasChanged();
+    }
+
+    private async Task ClearAsync()
+    {
+        text = "";
+        filterEditing = false;
+        open = false;
+        HighlightIndex = -1;
+        if (!ValuesEqual(Value, default!))
+            await ValueChanged.InvokeAsync(default!);
+    }
+
+    private async Task SyncTextToValueAsync()
+    {
+        var t = text.Trim();
+
+        if (string.IsNullOrEmpty(t))
+        {
+            if (!ValuesEqual(Value, default!))
+                await ValueChanged.InvokeAsync(default!);
+            text = "";
+            return;
+        }
+
+        foreach (var o in AllOptionsForTextMatch())
+        {
+            if (string.Equals(o.Text, t, StringComparison.OrdinalIgnoreCase))
+            {
+                if (!ValuesEqual(Value, o.Value))
+                    await ValueChanged.InvokeAsync(o.Value!);
+                text = o.Text;
+                return;
+            }
+        }
+
+        if (AllowCustomValue && IsStringValueType)
+        {
+            var boxed = (TValue)(object)t;
+            if (!ValuesEqual(Value, boxed))
+                await ValueChanged.InvokeAsync(boxed);
+            text = t;
+            return;
+        }
+
+        text = FormatDisplayFromValue();
+    }
+
+    private async Task SelectAsync(ComboboxOption<TValue> option)
+    {
+        filterEditing = false;
+        if (EmptyRowWhenUnfiltered is { } emptyRow && ValuesEqual(option.Value, emptyRow.Value))
+            text = "";
+        else
+            text = option.Text;
+        open = false;
+        HighlightIndex = -1;
+        if (!ValuesEqual(Value, option.Value))
+            await ValueChanged.InvokeAsync(option.Value!);
+    }
+
+    private void ResetHighlight()
+    {
+        HighlightIndex = _visibleOptions.Count > 0 ? 0 : -1;
+    }
+
+    private async Task OnInputKeyDownAsync(KeyboardEventArgs e)
+    {
+        if (IsEffectivelyDisabled)
+            return;
+
+        if (e.Key == "Escape")
+        {
+            open = false;
+            filterEditing = false;
+            text = FormatDisplayFromValue();
+            HighlightIndex = -1;
+            RebuildVisibleOptions();
+            return;
+        }
+
+        if (e.Key == "ArrowDown")
+        {
+            if (!open)
+            {
+                open = true;
+                filterEditing = false;
+                RebuildVisibleOptions();
+            }
+            var count = _visibleOptions.Count;
+            if (count == 0)
+                return;
+            HighlightIndex = HighlightIndex < 0 ? 0 : (HighlightIndex + 1) % count;
+            return;
+        }
+
+        if (e.Key == "ArrowUp")
+        {
+            if (!open)
+            {
+                open = true;
+                filterEditing = false;
+                RebuildVisibleOptions();
+            }
+            var count = _visibleOptions.Count;
+            if (count == 0)
+                return;
+            HighlightIndex = HighlightIndex <= 0 ? count - 1 : HighlightIndex - 1;
+            return;
+        }
+
+        if (e.Key != "Enter")
+            return;
+
+        if (!open || _visibleOptions.Count == 0)
+            return;
+
+        var idx = HighlightIndex < 0 ? 0 : HighlightIndex;
+        await SelectAsync(_visibleOptions[idx]);
+    }
+}
