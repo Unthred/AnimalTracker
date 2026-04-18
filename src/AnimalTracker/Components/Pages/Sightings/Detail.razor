@@ -3,6 +3,7 @@
 @implements IDisposable
 
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Web
 @attribute [Authorize]
 
 @using AnimalTracker.Services
@@ -91,19 +92,30 @@ else
         }
         else
         {
-            @if (sighting.Photos.Count > 1)
-            {
-                <p class="text-xs text-slate-500 dark:text-slate-400">Click a photo to preview it as the background.</p>
-            }
+            <p class="text-xs text-slate-500 dark:text-slate-400">Click a photo to use it as the page background, or choose View for a clean fullscreen preview.</p>
             <div class="mt-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-                @foreach (var p in sighting.Photos)
+                @foreach (var item in sighting.Photos.Select((photo, index) => new { photo, index }))
                 {
-                    <button type="button"
-                            title="Use as background"
-                            @onclick="() => SetBackgroundPhoto(p.Id)"
-                            class="group block w-full overflow-hidden rounded-xl border border-slate-200/80 bg-transparent p-0 text-left shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:shadow-md dark:border-slate-700 dark:hover:border-slate-600">
-                        <img src="@($"/photos/{p.Id}")" alt="@p.OriginalFileName" class="h-32 w-full object-cover transition duration-200 group-hover:scale-[1.02]" />
-                    </button>
+                    <div class="overflow-hidden rounded-xl border border-slate-200/80 bg-white/65 shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-950/35 dark:hover:border-slate-600">
+                        <button type="button"
+                                title="Use as background"
+                                @onclick="() => SetBackgroundPhoto(item.photo.Id)"
+                                class="group block w-full bg-transparent p-0 text-left">
+                            <img src="@($"/photos/{item.photo.Id}")"
+                                 alt="@GetPhotoAlt(item.photo)"
+                                 class="h-32 w-full object-cover transition duration-200 group-hover:scale-[1.02]" />
+                        </button>
+                        <div class="flex items-center justify-between gap-2 border-t border-slate-200/80 px-3 py-2 dark:border-slate-800/80">
+                            <button type="button"
+                                    class="rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-700 transition duration-200 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-slate-50"
+                                    @onclick="() => OpenPhotoViewer(item.index)">
+                                View
+                            </button>
+                            <span class="text-[11px] font-medium uppercase tracking-[0.12em] @(selectedBackgroundPhotoId == item.photo.Id ? "text-[color:var(--accent)]" : "text-slate-400 dark:text-slate-500")">
+                                @(selectedBackgroundPhotoId == item.photo.Id ? "Background active" : "Background")
+                            </span>
+                        </div>
+                    </div>
                 }
             </div>
         }
@@ -125,6 +137,22 @@ else
             </div>
         }
     </UICard>
+
+    @if (ActiveViewerPhoto is not null)
+    {
+        <section class="fixed inset-0 z-[1810] bg-slate-950"
+                 role="dialog"
+                 aria-modal="true"
+                 aria-label="Photo viewer"
+                 tabindex="0"
+                 autofocus
+                 @onkeydown="HandleViewerKeyDown"
+                 @onclick="ClosePhotoViewer">
+            <img src="@($"/photos/{ActiveViewerPhoto.Id}")"
+                 alt="@GetPhotoAlt(ActiveViewerPhoto)"
+                 class="h-screen w-screen object-contain" />
+        </section>
+    }
 }
 
 @code {
@@ -135,18 +163,28 @@ else
     private bool showDeleteConfirm;
     private string? deleteError;
     private IDisposable? backgroundScope;
+    private int? selectedBackgroundPhotoId;
+    private int activeViewerIndex = -1;
+
+    private SightingPhoto? ActiveViewerPhoto =>
+        sighting is not null && activeViewerIndex >= 0 && activeViewerIndex < sighting.Photos.Count
+            ? sighting.Photos[activeViewerIndex]
+            : null;
 
     protected override async Task OnParametersSetAsync()
     {
         loading = true;
         showDeleteConfirm = false;
         deleteError = null;
+        activeViewerIndex = -1;
+        selectedBackgroundPhotoId = null;
         sighting = await Sightings.GetAsync(Id);
         backgroundScope?.Dispose();
         backgroundScope = null;
         if (sighting?.Photos.Count > 0)
         {
-            backgroundScope = Prefs.UseTemporaryBackground($"/photos/{sighting.Photos[0].Id}");
+            selectedBackgroundPhotoId = sighting.Photos[0].Id;
+            backgroundScope = Prefs.UseTemporaryBackground($"/photos/{selectedBackgroundPhotoId}");
         }
         loading = false;
     }
@@ -180,8 +218,51 @@ else
     private void SetBackgroundPhoto(int photoId)
     {
         backgroundScope?.Dispose();
+        selectedBackgroundPhotoId = photoId;
         backgroundScope = Prefs.UseTemporaryBackground($"/photos/{photoId}");
     }
+
+    private void OpenPhotoViewer(int index)
+    {
+        if (sighting is null || index < 0 || index >= sighting.Photos.Count)
+            return;
+
+        activeViewerIndex = index;
+    }
+
+    private void ClosePhotoViewer() =>
+        activeViewerIndex = -1;
+
+    private void ShowPreviousPhoto()
+    {
+        if (sighting is null || sighting.Photos.Count == 0)
+            return;
+
+        activeViewerIndex = activeViewerIndex <= 0
+            ? sighting.Photos.Count - 1
+            : activeViewerIndex - 1;
+    }
+
+    private void ShowNextPhoto()
+    {
+        if (sighting is null || sighting.Photos.Count == 0)
+            return;
+
+        activeViewerIndex = activeViewerIndex >= sighting.Photos.Count - 1
+            ? 0
+            : activeViewerIndex + 1;
+    }
+
+    private void HandleViewerKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape")
+            ClosePhotoViewer();
+    }
+
+    private static string GetPhotoAlt(SightingPhoto photo) =>
+        string.IsNullOrWhiteSpace(photo.OriginalFileName)
+            ? "Sighting photo"
+            : photo.OriginalFileName;
 
     // Photo upload moved to Add Sighting.
 }
