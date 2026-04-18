@@ -28,7 +28,7 @@ else
 }
 <div class="pointer-events-none fixed inset-0 -z-10 opacity-60 [background:radial-gradient(600px_circle_at_20%_10%,color-mix(in_srgb,var(--accent)_18%,transparent),transparent_55%),radial-gradient(600px_circle_at_80%_20%,rgba(99,102,241,0.18),transparent_55%)]"></div>
 
-<div class="mx-auto w-full max-w-xl py-10 sm:py-14">
+<div class="mx-auto w-full max-w-xl py-8 sm:py-14">
     <UIPageHeader Title="Log in" Description="Welcome back. Sign in to continue." />
 
     <UICard>
@@ -70,7 +70,7 @@ else
                 <ValidationMessage For="() => Input.Password" class="text-danger" />
             </UIField>
 
-            <label class="inline-flex cursor-pointer items-center gap-3 text-sm text-slate-700 dark:text-slate-200">
+            <label class="inline-flex cursor-pointer items-center gap-3 text-base text-slate-700 dark:text-slate-200 sm:text-sm">
                 <InputCheckbox @bind-Value="Input.RememberMe" class="checkbox-soft size-[1.125rem]" />
                 Remember me
             </label>
@@ -79,17 +79,17 @@ else
 
             <div class="flex items-center gap-3">
                 <div class="h-px flex-1 bg-slate-200/80 dark:bg-slate-800/80"></div>
-                <div class="text-xs font-medium text-slate-500 dark:text-slate-400">OR</div>
+                <div class="text-sm font-medium text-slate-500 dark:text-slate-400 sm:text-xs">OR</div>
                 <div class="h-px flex-1 bg-slate-200/80 dark:bg-slate-800/80"></div>
             </div>
 
             <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                 <PasskeySubmit Operation="PasskeyOperation.Request" Name="Input.Passkey" EmailName="Input.Email"
-                               class="btn w-full sm:w-auto">Log in with a passkey</PasskeySubmit>
-                <a class="btn w-full sm:w-auto text-center" href="Account/ForgotPassword">Forgot password</a>
+                              class="btn w-full text-base sm:w-auto sm:text-sm">Log in with a passkey</PasskeySubmit>
+                <a class="btn w-full text-center text-base sm:w-auto sm:text-sm" href="Account/ForgotPassword">Forgot password</a>
             </div>
 
-            <div class="text-sm text-slate-600 dark:text-slate-300">
+            <div class="text-base text-slate-600 dark:text-slate-300 sm:text-sm">
                 <a class="font-medium text-slate-900 hover:underline dark:text-slate-50"
                    href="@(NavigationManager.GetUriWithQueryParameters("Account/Register", new Dictionary<string, object?> { ["ReturnUrl"] = ReturnUrl }))">Create an account</a>
                 <span class="mx-2 text-slate-400">·</span>

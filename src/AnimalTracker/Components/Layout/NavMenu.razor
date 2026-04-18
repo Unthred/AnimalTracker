@@ -300,195 +300,198 @@
     </div>
 </div>
 
-<div class="nav-variant nav-variant--mobile">
-    @if (mobileMoreOpen)
-    {
-        <button type="button"
-                class="mobile-more-backdrop"
-                aria-label="Close more menu"
-                @onclick="CloseMobileMore"></button>
+@if (!HideMobileNav)
+{
+    <div class="nav-variant nav-variant--mobile">
+        @if (mobileMoreOpen)
+        {
+            <button type="button"
+                    class="mobile-more-backdrop"
+                    aria-label="Close more menu"
+                    @onclick="CloseMobileMore"></button>
 
-        <section id="mobile-more-sheet"
-                 class="mobile-more-sheet"
-                 role="dialog"
-                 aria-modal="true"
-                 aria-label="More navigation">
-            <div class="mobile-more-sheet__header">
-                <p class="mobile-more-sheet__eyebrow">More</p>
-                <button type="button"
-                        class="mobile-more-sheet__close"
-                        aria-label="Close more menu"
-                        @onclick="CloseMobileMore">
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M6 6l12 12M18 6L6 18" />
-                    </svg>
-                </button>
-            </div>
+            <section id="mobile-more-sheet"
+                     class="mobile-more-sheet"
+                     role="dialog"
+                     aria-modal="true"
+                     aria-label="More navigation">
+                <div class="mobile-more-sheet__header">
+                    <p class="mobile-more-sheet__eyebrow">More</p>
+                    <button type="button"
+                            class="mobile-more-sheet__close"
+                            aria-label="Close more menu"
+                            @onclick="CloseMobileMore">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M6 6l12 12M18 6L6 18" />
+                        </svg>
+                    </button>
+                </div>
 
-            <div class="mobile-more-sheet__content">
-                <section class="mobile-more-group">
-                    <p class="mobile-more-group__label">Explore</p>
-                    <div class="mobile-more-group__items">
-                        <NavLink class="mobile-more-link" href="stats" @onclick="CloseMobileMore">
-                            Stats
-                        </NavLink>
-                        <NavLink class="mobile-more-link" href="sightings/import" @onclick="CloseMobileMore">
-                            Import photos
-                        </NavLink>
-                        <NavLink class="mobile-more-link" href="species" @onclick="CloseMobileMore">
-                            Species lookup
-                        </NavLink>
-                    </div>
-                </section>
+                <div class="mobile-more-sheet__content">
+                    <section class="mobile-more-group">
+                        <p class="mobile-more-group__label">Explore</p>
+                        <div class="mobile-more-group__items">
+                            <NavLink class="mobile-more-link" href="stats" @onclick="CloseMobileMore">
+                                Stats
+                            </NavLink>
+                            <NavLink class="mobile-more-link" href="sightings/import" @onclick="CloseMobileMore">
+                                Import photos
+                            </NavLink>
+                            <NavLink class="mobile-more-link" href="species" @onclick="CloseMobileMore">
+                                Species lookup
+                            </NavLink>
+                        </div>
+                    </section>
 
-                <section class="mobile-more-group">
-                    <p class="mobile-more-group__label">System</p>
-                    <div class="mobile-more-group__items">
-                        <NavLink class="mobile-more-link" href="settings" @onclick="CloseMobileMore">
-                            Settings
-                        </NavLink>
-                    </div>
-                </section>
+                    <section class="mobile-more-group">
+                        <p class="mobile-more-group__label">System</p>
+                        <div class="mobile-more-group__items">
+                            <NavLink class="mobile-more-link" href="settings" @onclick="CloseMobileMore">
+                                Settings
+                            </NavLink>
+                        </div>
+                    </section>
 
-                <AuthorizeView>
-                    <Authorized Context="auth">
-                        <section class="mobile-more-group">
-                            <p class="mobile-more-group__label">Account</p>
-                            <p class="mobile-more-group__meta">@auth.User.Identity?.Name</p>
-                            <div class="mobile-more-group__items">
-                                <NavLink class="mobile-more-link" href="Account/Manage" Match="NavLinkMatch.All" @onclick="CloseMobileMore">
-                                    Profile
-                                </NavLink>
-                                <NavLink class="mobile-more-link" href="Account/Manage/Email" @onclick="CloseMobileMore">
-                                    Email
-                                </NavLink>
-                                <NavLink class="mobile-more-link" href="Account/Manage/PersonalData" @onclick="CloseMobileMore">
-                                    Personal data
-                                </NavLink>
-                            </div>
-                        </section>
-
-                        <section class="mobile-more-group">
-                            <p class="mobile-more-group__label">Security</p>
-                            <div class="mobile-more-group__items">
-                                <NavLink class="mobile-more-link" href="Account/Manage/ChangePassword" @onclick="CloseMobileMore">
-                                    Password
-                                </NavLink>
-                                <NavLink class="mobile-more-link" href="Account/Manage/TwoFactorAuthentication" @onclick="CloseMobileMore">
-                                    Two-factor authentication
-                                </NavLink>
-                                <NavLink class="mobile-more-link" href="Account/Manage/Passkeys" @onclick="CloseMobileMore">
-                                    Passkeys
-                                </NavLink>
-                            </div>
-                        </section>
-
-                        @if (isCurrentUserAdmin)
-                        {
+                    <AuthorizeView>
+                        <Authorized Context="auth">
                             <section class="mobile-more-group">
-                                <p class="mobile-more-group__label">Administration</p>
+                                <p class="mobile-more-group__label">Account</p>
+                                <p class="mobile-more-group__meta">@auth.User.Identity?.Name</p>
                                 <div class="mobile-more-group__items">
-                                    <NavLink class="mobile-more-link" href="admin" @onclick="CloseMobileMore">
-                                        Admin
+                                    <NavLink class="mobile-more-link" href="Account/Manage" Match="NavLinkMatch.All" @onclick="CloseMobileMore">
+                                        Profile
+                                    </NavLink>
+                                    <NavLink class="mobile-more-link" href="Account/Manage/Email" @onclick="CloseMobileMore">
+                                        Email
+                                    </NavLink>
+                                    <NavLink class="mobile-more-link" href="Account/Manage/PersonalData" @onclick="CloseMobileMore">
+                                        Personal data
                                     </NavLink>
                                 </div>
                             </section>
-                        }
 
-                        <form action="Account/Logout" method="post" class="mobile-more-logout">
-                            <AntiforgeryToken />
-                            <input type="hidden" name="ReturnUrl" value="@currentUrl" />
-                            <button type="submit" class="mobile-more-link mobile-more-link--danger">Log out</button>
-                        </form>
-                    </Authorized>
-                    <NotAuthorized>
-                        <section class="mobile-more-group">
-                            <p class="mobile-more-group__label">Account</p>
-                            <div class="mobile-more-group__items">
-                                <NavLink class="mobile-more-link" href="Account/Register" @onclick="CloseMobileMore">
-                                    Register
-                                </NavLink>
-                                <NavLink class="mobile-more-link" href="Account/Login" @onclick="CloseMobileMore">
-                                    Login
-                                </NavLink>
-                            </div>
-                        </section>
-                    </NotAuthorized>
-                </AuthorizeView>
-            </div>
-        </section>
-    }
+                            <section class="mobile-more-group">
+                                <p class="mobile-more-group__label">Security</p>
+                                <div class="mobile-more-group__items">
+                                    <NavLink class="mobile-more-link" href="Account/Manage/ChangePassword" @onclick="CloseMobileMore">
+                                        Password
+                                    </NavLink>
+                                    <NavLink class="mobile-more-link" href="Account/Manage/TwoFactorAuthentication" @onclick="CloseMobileMore">
+                                        Two-factor authentication
+                                    </NavLink>
+                                    <NavLink class="mobile-more-link" href="Account/Manage/Passkeys" @onclick="CloseMobileMore">
+                                        Passkeys
+                                    </NavLink>
+                                </div>
+                            </section>
 
-    <nav class="mobile-bottom-nav" aria-label="Primary mobile navigation">
-        <NavLink class="mobile-bottom-nav__link"
-                 href=""
-                 aria-label="Timeline"
-                 title="Timeline"
-                 Match="NavLinkMatch.All">
-            <span class="mobile-bottom-nav__icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24">
-                    <path d="M4 10.5 12 4l8 6.5" />
-                    <path d="M6.75 9.75V20h10.5V9.75" />
-                </svg>
-            </span>
-        </NavLink>
+                            @if (isCurrentUserAdmin)
+                            {
+                                <section class="mobile-more-group">
+                                    <p class="mobile-more-group__label">Administration</p>
+                                    <div class="mobile-more-group__items">
+                                        <NavLink class="mobile-more-link" href="admin" @onclick="CloseMobileMore">
+                                            Admin
+                                        </NavLink>
+                                    </div>
+                                </section>
+                            }
 
-        <NavLink class="mobile-bottom-nav__link"
-                 href="map"
-                 aria-label="Map"
-                 title="Map">
-            <span class="mobile-bottom-nav__icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24">
-                    <path d="M9 18 3.75 20V6L9 4l6 2 5.25-2v14L15 20l-6-2Z" />
-                    <path d="M9 4v14" />
-                    <path d="M15 6v14" />
-                </svg>
-            </span>
-        </NavLink>
+                            <form action="Account/Logout" method="post" class="mobile-more-logout">
+                                <AntiforgeryToken />
+                                <input type="hidden" name="ReturnUrl" value="@currentUrl" />
+                                <button type="submit" class="mobile-more-link mobile-more-link--danger">Log out</button>
+                            </form>
+                        </Authorized>
+                        <NotAuthorized>
+                            <section class="mobile-more-group">
+                                <p class="mobile-more-group__label">Account</p>
+                                <div class="mobile-more-group__items">
+                                    <NavLink class="mobile-more-link" href="Account/Register" @onclick="CloseMobileMore">
+                                        Register
+                                    </NavLink>
+                                    <NavLink class="mobile-more-link" href="Account/Login" @onclick="CloseMobileMore">
+                                        Login
+                                    </NavLink>
+                                </div>
+                            </section>
+                        </NotAuthorized>
+                    </AuthorizeView>
+                </div>
+            </section>
+        }
 
-        <a class="mobile-bottom-nav__action @(IsRouteOrChild("sightings/new") ? "active" : null)"
-           href="sightings/new"
-           aria-label="Add sighting"
-           title="Add sighting">
-            <span class="mobile-bottom-nav__action-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24">
-                    <path d="M12 5v14" />
-                    <path d="M5 12h14" />
-                </svg>
-            </span>
-        </a>
+        <nav class="mobile-bottom-nav" aria-label="Primary mobile navigation">
+            <NavLink class="mobile-bottom-nav__link mobile-bottom-nav__link--slot-1"
+                     href=""
+                     aria-label="Timeline"
+                     title="Timeline"
+                     Match="NavLinkMatch.All">
+                <span class="mobile-bottom-nav__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M4 10.5 12 4l8 6.5" />
+                        <path d="M6.75 9.75V20h10.5V9.75" />
+                    </svg>
+                </span>
+            </NavLink>
 
-        <NavLink class="mobile-bottom-nav__link"
-                 href="animals"
-                 aria-label="Animals"
-                 title="Animals">
-            <span class="mobile-bottom-nav__icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24">
-                    <path d="M7.5 11.25c1.2 0 2.25-.98 2.25-2.25S8.7 6.75 7.5 6.75 5.25 7.73 5.25 9s1.05 2.25 2.25 2.25Z" />
-                    <path d="M16.5 11.25c1.2 0 2.25-.98 2.25-2.25s-1.05-2.25-2.25-2.25S14.25 7.73 14.25 9s1.05 2.25 2.25 2.25Z" />
-                    <path d="M12 8.5c1.24 0 2.25-1.06 2.25-2.38S13.24 3.75 12 3.75 9.75 4.8 9.75 6.12 10.76 8.5 12 8.5Z" />
-                    <path d="M6.5 19.5c0-2.62 2.46-4.75 5.5-4.75s5.5 2.13 5.5 4.75c0 .41-.34.75-.75.75h-9.5a.75.75 0 0 1-.75-.75Z" />
-                </svg>
-            </span>
-        </NavLink>
+            <NavLink class="mobile-bottom-nav__link mobile-bottom-nav__link--slot-2"
+                     href="map"
+                     aria-label="Map"
+                     title="Map">
+                <span class="mobile-bottom-nav__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M9 18 3.75 20V6L9 4l6 2 5.25-2v14L15 20l-6-2Z" />
+                        <path d="M9 4v14" />
+                        <path d="M15 6v14" />
+                    </svg>
+                </span>
+            </NavLink>
 
-        <button type="button"
-                class="mobile-bottom-nav__link @((mobileMoreOpen || IsMobileMoreActive) ? "active" : null)"
-                aria-label="More"
-                title="More"
-                aria-expanded="@(mobileMoreOpen ? "true" : "false")"
-                aria-controls="mobile-more-sheet"
-                @onclick="ToggleMobileMore">
-            <span class="mobile-bottom-nav__icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24">
-                    <path d="M5 7h14" />
-                    <path d="M5 12h14" />
-                    <path d="M5 17h14" />
-                </svg>
-            </span>
-        </button>
-    </nav>
-</div>
+            <a class="mobile-bottom-nav__action mobile-bottom-nav__action--center @(IsRouteOrChild("sightings/new") ? "active" : null)"
+               href="sightings/new"
+               aria-label="Add sighting"
+               title="Add sighting">
+                <span class="mobile-bottom-nav__action-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M12 5v14" />
+                        <path d="M5 12h14" />
+                    </svg>
+                </span>
+            </a>
+
+            <NavLink class="mobile-bottom-nav__link mobile-bottom-nav__link--slot-4"
+                     href="animals"
+                     aria-label="Animals"
+                     title="Animals">
+                <span class="mobile-bottom-nav__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M7.5 11.25c1.2 0 2.25-.98 2.25-2.25S8.7 6.75 7.5 6.75 5.25 7.73 5.25 9s1.05 2.25 2.25 2.25Z" />
+                        <path d="M16.5 11.25c1.2 0 2.25-.98 2.25-2.25s-1.05-2.25-2.25-2.25S14.25 7.73 14.25 9s1.05 2.25 2.25 2.25Z" />
+                        <path d="M12 8.5c1.24 0 2.25-1.06 2.25-2.38S13.24 3.75 12 3.75 9.75 4.8 9.75 6.12 10.76 8.5 12 8.5Z" />
+                        <path d="M6.5 19.5c0-2.62 2.46-4.75 5.5-4.75s5.5 2.13 5.5 4.75c0 .41-.34.75-.75.75h-9.5a.75.75 0 0 1-.75-.75Z" />
+                    </svg>
+                </span>
+            </NavLink>
+
+            <button type="button"
+                    class="mobile-bottom-nav__link mobile-bottom-nav__link--slot-5 @((mobileMoreOpen || IsMobileMoreActive) ? "active" : null)"
+                    aria-label="More"
+                    title="More"
+                    aria-expanded="@(mobileMoreOpen ? "true" : "false")"
+                    aria-controls="mobile-more-sheet"
+                    @onclick="ToggleMobileMore">
+                <span class="mobile-bottom-nav__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M5 7h14" />
+                        <path d="M5 12h14" />
+                        <path d="M5 17h14" />
+                    </svg>
+                </span>
+            </button>
+        </nav>
+    </div>
+}
 
 @code {
     private string? currentUrl;
@@ -522,6 +525,11 @@
         (currentUrl.StartsWith("Account/Manage", StringComparison.OrdinalIgnoreCase)
          || currentUrl.Equals("admin", StringComparison.OrdinalIgnoreCase)
          || currentUrl.StartsWith("admin/", StringComparison.OrdinalIgnoreCase));
+
+    private bool HideMobileNav =>
+        !string.IsNullOrWhiteSpace(currentUrl) &&
+        currentUrl.StartsWith("Account/", StringComparison.OrdinalIgnoreCase) &&
+        !currentUrl.StartsWith("Account/Manage", StringComparison.OrdinalIgnoreCase);
 
     private bool ShowAccountMenu => accountMenuExpanded || IsOnAccountPage;
 

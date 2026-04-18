@@ -31,7 +31,7 @@ else
 }
 <div class="pointer-events-none fixed inset-0 -z-10 opacity-60 [background:radial-gradient(600px_circle_at_20%_10%,color-mix(in_srgb,var(--accent)_18%,transparent),transparent_55%),radial-gradient(600px_circle_at_80%_20%,rgba(99,102,241,0.18),transparent_55%)]"></div>
 
-<div class="mx-auto w-full max-w-xl py-10 sm:py-14">
+<div class="mx-auto w-full max-w-xl py-8 sm:py-14">
     <UIPageHeader Title="Create account" Description="Register to start tracking sightings." />
 
     <UICard>
@@ -66,12 +66,12 @@ else
 
             @if (canBecomeAdmin)
             {
-                <div class="rounded-xl border border-emerald-200/80 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/50 dark:text-emerald-200">
+                <div class="rounded-xl border border-emerald-200/80 bg-emerald-50 px-4 py-3 text-base text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/50 dark:text-emerald-200 sm:text-sm">
                     This first account becomes the admin account.
                 </div>
             }
 
-            <div class="text-sm text-slate-600 dark:text-slate-300">
+            <div class="text-base text-slate-600 dark:text-slate-300 sm:text-sm">
                 Already have an account?
                 <a class="font-medium text-slate-900 hover:underline dark:text-slate-50"
                    href="@(NavigationManager.GetUriWithQueryParameters("Account/Login", new Dictionary<string, object?> { ["ReturnUrl"] = ReturnUrl }))">Log in</a>
