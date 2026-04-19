@@ -17,6 +17,14 @@ public sealed record PhotoImportBatchResult(
     int NeedsReviewItems,
     IReadOnlyList<string> Errors);
 
+public sealed record PhotoImportProgress(
+    string Stage,
+    string StatusText,
+    string? CurrentFileName,
+    int Current,
+    int Total,
+    int Percent);
+
 public sealed class PhotoImportService(
     ApplicationDbContext db,
     CurrentUserService currentUser,
@@ -35,10 +43,19 @@ public sealed class PhotoImportService(
         IReadOnlyList<IBrowserFile> files,
         int? fallbackSpeciesId,
         int? locationId,
+        Func<PhotoImportProgress, Task>? progress = null,
         CancellationToken cancellationToken = default)
     {
         if (files.Count == 0)
             throw new ArgumentException("No files selected.", nameof(files));
+
+        await ReportProgressAsync(
+            progress,
+            stage: "Scanning photos",
+            statusText: $"Scanning photo 1 of {files.Count}",
+            currentFileName: files[0].Name,
+            current: 0,
+            total: files.Count);
 
         var userId = await currentUser.GetRequiredUserIdAsync(cancellationToken);
         var speciesList = await speciesService.GetAllAsync(cancellationToken);
@@ -70,9 +87,20 @@ public sealed class PhotoImportService(
         var skippedDup = 0;
         var failed = 0;
         var needsReview = 0;
+        var fileIndex = 0;
 
         foreach (var file in files)
         {
+            fileIndex++;
+
+            await ReportProgressAsync(
+                progress,
+                stage: "Scanning photos",
+                statusText: $"Scanning photo {fileIndex} of {files.Count}",
+                currentFileName: file.Name,
+                current: fileIndex - 1,
+                total: files.Count);
+
             try
             {
                 await using var raw = new MemoryStream();
@@ -185,11 +213,36 @@ public sealed class PhotoImportService(
             }
         }
 
+        if (workItems.Count == 0)
+        {
+            await ReportProgressAsync(
+                progress,
+                stage: "Finishing import",
+                statusText: skippedDup == files.Count
+                    ? $"All {files.Count} selected photos were already imported."
+                    : "No photos needed to be saved.",
+                currentFileName: null,
+                current: files.Count,
+                total: files.Count);
+        }
+
         var clusters = PhotoBurstClustering.Cluster(workItems, timeWindow, distanceM);
         var createdSightings = 0;
         var photosAttached = 0;
         int? firstSightingId = null;
 
+        if (workItems.Count > 0)
+        {
+            await ReportProgressAsync(
+                progress,
+                stage: "Saving imported photos",
+                statusText: $"Saving photo 1 of {workItems.Count}",
+                currentFileName: workItems[0].OriginalFileName,
+                current: 0,
+                total: workItems.Count);
+        }
+
+        var savedPhotoIndex = 0;
         foreach (var cluster in clusters)
         {
             if (cluster.Count == 0)
@@ -222,6 +275,16 @@ public sealed class PhotoImportService(
 
             foreach (var item in cluster)
             {
+                savedPhotoIndex++;
+
+                await ReportProgressAsync(
+                    progress,
+                    stage: "Saving imported photos",
+                    statusText: $"Saving photo {savedPhotoIndex} of {workItems.Count}",
+                    currentFileName: item.OriginalFileName,
+                    current: savedPhotoIndex - 1,
+                    total: workItems.Count);
+
                 await using var photoStream = new MemoryStream(item.SourceBytes, writable: false);
                 var stored = await storage.SaveSightingPhotoFromStreamAsync(
                     photoStream,
@@ -267,6 +330,14 @@ public sealed class PhotoImportService(
         batch.NeedsReviewCount = needsReview;
         await db.SaveChangesAsync(cancellationToken);
 
+        await ReportProgressAsync(
+            progress,
+            stage: "Import complete",
+            statusText: $"Processed {files.Count} photo(s).",
+            currentFileName: null,
+            current: Math.Max(workItems.Count, files.Count),
+            total: Math.Max(workItems.Count, files.Count));
+
         return new PhotoImportBatchResult(
             batch.Id,
             firstSightingId,
@@ -276,5 +347,29 @@ public sealed class PhotoImportService(
             failed,
             needsReview,
             errors);
+    }
+
+    private static Task ReportProgressAsync(
+        Func<PhotoImportProgress, Task>? progress,
+        string stage,
+        string statusText,
+        string? currentFileName,
+        int current,
+        int total)
+    {
+        if (progress is null)
+            return Task.CompletedTask;
+
+        var safeTotal = Math.Max(total, 1);
+        var safeCurrent = Math.Clamp(current, 0, safeTotal);
+        var update = new PhotoImportProgress(
+            stage,
+            statusText,
+            currentFileName,
+            safeCurrent,
+            safeTotal,
+            (int)Math.Round((double)safeCurrent / safeTotal * 100, MidpointRounding.AwayFromZero));
+
+        return progress(update);
     }
 }
