@@ -64,6 +64,13 @@
     }
 }
 
+@media (min-width: 768px) and (max-width: 1023.98px) and (orientation: portrait) {
+    .app-layout-shell {
+        grid-template-columns: minmax(0, 13rem) minmax(0, 1fr);
+        gap: 1.5rem;
+    }
+}
+
 @media (min-width: 1024px) {
     .app-layout-shell {
         grid-template-columns: minmax(0, 17rem) minmax(0, 1fr);
