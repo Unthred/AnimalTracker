@@ -22,8 +22,9 @@ internal sealed class SmtpIdentityEmailSender(
             HtmlBody = htmlBody
         }.ToMessageBody();
 
-        logger.LogInformation("Sending auth email '{Subject}' to {Email} via SMTP host {Host}:{Port}.",
-            subject, toEmail, options.Host, options.Port);
+        // Avoid logging email addresses (PII) in application logs.
+        logger.LogInformation("Sending auth email '{Subject}' via SMTP host {Host}:{Port}.",
+            subject, options.Host, options.Port);
 
         using var client = new SmtpClient
         {

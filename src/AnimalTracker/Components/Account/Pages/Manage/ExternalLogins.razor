@@ -63,8 +63,6 @@
 }
 
 @code {
-    public const string LinkLoginCallbackAction = "LinkLoginCallback";
-
     private ApplicationUser? user;
     private IList<UserLoginInfo>? currentLogins;
     private IList<AuthenticationScheme>? otherLogins;
@@ -78,9 +76,6 @@
 
     [SupplyParameterFromForm]
     private string? ProviderKey { get; set; }
-
-    [SupplyParameterFromQuery]
-    private string? Action { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
@@ -104,9 +99,15 @@
 
         showRemoveButton = passwordHash is not null || currentLogins.Count > 1;
 
-        if (HttpMethods.IsGet(HttpContext.Request.Method) && Action == LinkLoginCallbackAction)
+        if (HttpMethods.IsGet(HttpContext.Request.Method))
         {
-            await OnGetLinkLoginCallbackAsync();
+            // Only complete an external-link callback if the external auth cookie exists and
+            // we can load external login info for this user. Avoid user-controlled query-string
+            // switches (CodeQL: user-controlled bypass).
+            var userId = await UserManager.GetUserIdAsync(user);
+            var info = await SignInManager.GetExternalLoginInfoAsync(userId);
+            if (info is not null)
+                await OnGetLinkLoginCallbackAsync();
         }
     }
 
