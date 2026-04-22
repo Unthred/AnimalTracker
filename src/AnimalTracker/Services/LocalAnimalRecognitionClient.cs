@@ -20,7 +20,7 @@ public sealed class LocalAnimalRecognitionClient(
         if (imageStream.CanSeek)
             imageStream.Position = 0;
         await imageStream.CopyToAsync(buffer, cancellationToken);
-        buffer.Position = 0;
+        var payload = buffer.ToArray();
 
         var client = httpClientFactory.CreateClient(nameof(LocalAnimalRecognitionClient));
         var maxRetries = Math.Clamp(opt.MaxRetries, 0, 5);
@@ -28,9 +28,9 @@ public sealed class LocalAnimalRecognitionClient(
         {
             try
             {
-                buffer.Position = 0;
+                using var requestStream = new MemoryStream(payload, writable: false);
                 using var content = new MultipartFormDataContent();
-                var streamContent = new StreamContent(buffer);
+                var streamContent = new StreamContent(requestStream);
                 streamContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
                 content.Add(streamContent, "image", fileName);
 

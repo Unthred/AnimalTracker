@@ -16,7 +16,7 @@ public sealed record TerritoryDashboardData(
 
 public sealed class TerritoryInsightsService(
     ApplicationDbContext db,
-    CurrentUserService currentUser,
+    ICurrentUserAccessor currentUser,
     SightingService sightings)
 {
     public Task<AnimalTerritoryInsights?> GetAnimalInsightsAsync(

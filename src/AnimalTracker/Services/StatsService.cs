@@ -24,7 +24,7 @@ public sealed record SightingStatsSummary(
     IReadOnlyList<BehaviorCountRow> BehaviorCounts,
     IReadOnlyList<HourlySightingCount> HourlyCounts);
 
-public sealed class StatsService(ApplicationDbContext db, CurrentUserService currentUser)
+public sealed class StatsService(ApplicationDbContext db, ICurrentUserAccessor currentUser)
 {
     public async Task<SightingStatsSummary> GetSummaryAsync(
         DateTime? fromUtc,

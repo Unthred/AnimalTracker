@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AnimalTracker.Services;
 
-public sealed class AnimalService(ApplicationDbContext db, CurrentUserService currentUser)
+public sealed class AnimalService(ApplicationDbContext db, ICurrentUserAccessor currentUser)
 {
     public async Task<List<Animal>> SearchAsync(string? query, int? speciesId, CancellationToken cancellationToken = default)
     {

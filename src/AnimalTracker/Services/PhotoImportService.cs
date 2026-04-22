@@ -27,7 +27,7 @@ public sealed record PhotoImportProgress(
 
 public sealed class PhotoImportService(
     ApplicationDbContext db,
-    CurrentUserService currentUser,
+    ICurrentUserAccessor currentUser,
     SightingService sightings,
     PhotoStorageService storage,
     ExifMetadataService exif,

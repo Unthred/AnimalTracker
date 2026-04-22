@@ -20,7 +20,7 @@ public sealed record AdminUserRow(
 public sealed class AdminUserService(
     UserManager<ApplicationUser> userManager,
     RoleManager<IdentityRole> roleManager,
-    CurrentUserService currentUser,
+    ICurrentUserAccessor currentUser,
     AuthenticationStateProvider authStateProvider)
 {
     public const string AdminRoleName = "Admin";

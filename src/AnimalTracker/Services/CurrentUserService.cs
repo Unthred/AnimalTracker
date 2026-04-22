@@ -9,7 +9,7 @@ namespace AnimalTracker.Services;
 public sealed class CurrentUserService(
     AuthenticationStateProvider authStateProvider,
     IHttpContextAccessor httpContextAccessor,
-    UserManager<ApplicationUser> userManager)
+    UserManager<ApplicationUser> userManager) : ICurrentUserAccessor
 {
     private static readonly string[] UserIdClaimTypes =
     [

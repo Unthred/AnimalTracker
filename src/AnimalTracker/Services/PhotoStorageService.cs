@@ -13,7 +13,7 @@ public sealed record StoredPhoto(
     long SizeBytes,
     string Sha256Hex);
 
-public sealed class PhotoStorageService(IWebHostEnvironment env, CurrentUserService currentUser)
+public sealed class PhotoStorageService(IWebHostEnvironment env, ICurrentUserAccessor currentUser)
 {
     // Upload limits are about protecting server resources; we still optimize images after upload.
     public const long DefaultMaxUploadBytes = 25 * 1024 * 1024; // 25 MB (sighting photos)

@@ -41,8 +41,21 @@ builder.Services.ConfigureApplicationCookie(options =>
 
 // Use an absolute SQLite path so running from different working directories
 // doesn't silently create multiple databases (which breaks login persistence).
-var dbPath = Path.Combine(builder.Environment.ContentRootPath, "Data", "app.db");
-Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
+// Tests may override via configuration (AnimalTracker:SqlitePath).
+var dbPath = builder.Configuration["AnimalTracker:SqlitePath"];
+if (string.IsNullOrWhiteSpace(dbPath))
+{
+    dbPath = Path.Combine(builder.Environment.ContentRootPath, "Data", "app.db");
+    Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
+}
+else
+{
+    dbPath = Path.GetFullPath(dbPath);
+    var dbDir = Path.GetDirectoryName(dbPath);
+    if (!string.IsNullOrEmpty(dbDir))
+        Directory.CreateDirectory(dbDir);
+}
+
 var connectionString = $"Data Source={dbPath};Cache=Shared";
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlite(connectionString));
@@ -94,6 +107,7 @@ builder.Services.AddHttpClient(nameof(LocalAnimalRecognitionClient), (sp, client
 });
 builder.Services.AddScoped<IAnimalRecognitionService, LocalAnimalRecognitionClient>();
 builder.Services.AddScoped<CurrentUserService>();
+builder.Services.AddScoped<ICurrentUserAccessor>(sp => sp.GetRequiredService<CurrentUserService>());
 builder.Services.AddScoped<LoginAuditService>();
 builder.Services.AddScoped<LocationService>();
 builder.Services.AddScoped<SpeciesService>();
@@ -161,6 +175,27 @@ else
     // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
+
+// Required by OpenStreetMap tile usage policy so browsers send Referer on tile requests.
+// (Tiles may return "Access blocked: Referer is required" without this.)
+app.Use(async (context, next) =>
+{
+    context.Response.OnStarting(() =>
+    {
+        if (!context.Response.Headers.ContainsKey("Referrer-Policy"))
+            context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+
+        return Task.CompletedTask;
+    });
+
+    await next();
+
+    // Defensive: some endpoints (e.g. redirects) may not trigger header materialization
+    // the way we expect in all hosts; ensure it's present if we still can.
+    if (!context.Response.HasStarted && !context.Response.Headers.ContainsKey("Referrer-Policy"))
+        context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+});
+
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
 
@@ -277,7 +312,7 @@ app.MapRazorComponents<App>()
 
 app.MapGet("/user/background-image", [Authorize] async (
     ApplicationDbContext db,
-    CurrentUserService currentUser,
+    ICurrentUserAccessor currentUser,
     PhotoStorageService storage,
     CancellationToken cancellationToken) =>
 {
@@ -312,7 +347,7 @@ app.MapGet("/app/default-auth-image", async (
 app.MapGet("/photos/{id:int}", [Authorize] async (
     int id,
     ApplicationDbContext db,
-    CurrentUserService currentUser,
+    ICurrentUserAccessor currentUser,
     PhotoStorageService storage,
     CancellationToken cancellationToken) =>
 {
@@ -508,4 +543,8 @@ static string NormalizeThemeMode(string? mode)
 {
     var normalized = (mode ?? string.Empty).Trim().ToLowerInvariant();
     return normalized is "light" or "dark" ? normalized : "system";
+}
+
+public partial class Program
+{
 }

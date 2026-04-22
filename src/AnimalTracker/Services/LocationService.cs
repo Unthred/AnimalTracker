@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AnimalTracker.Services;
 
-public sealed class LocationService(ApplicationDbContext db, CurrentUserService currentUser)
+public sealed class LocationService(ApplicationDbContext db, ICurrentUserAccessor currentUser)
 {
     public async Task<List<Location>> GetAllAsync(CancellationToken cancellationToken = default)
     {

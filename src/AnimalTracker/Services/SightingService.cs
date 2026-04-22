@@ -50,7 +50,7 @@ public sealed record AnimalTerritoryInsights(
     int HuntingSightings,
     IReadOnlyList<SightingMapPoint> RecentPoints);
 
-public sealed class SightingService(ApplicationDbContext db, CurrentUserService currentUser, LocationService locations, PhotoStorageService photos)
+public sealed class SightingService(ApplicationDbContext db, ICurrentUserAccessor currentUser, LocationService locations, PhotoStorageService photos)
 {
     public async Task<List<Sighting>> GetRecentAsync(int take, SightingFilters filters, CancellationToken cancellationToken = default)
     {

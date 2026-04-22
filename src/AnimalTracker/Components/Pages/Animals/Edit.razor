@@ -55,11 +55,17 @@ else
             </UIField>
 
             <UIField Label="Identifying features" For="features">
-                <InputTextArea id="features" class="w-full min-w-0 px-3 py-2.5" @bind-Value="model.IdentifyingFeatures" rows="4" />
+                <InputTextArea id="features"
+                               class="w-full min-w-0 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80"
+                               @bind-Value="model.IdentifyingFeatures"
+                               rows="4" />
             </UIField>
 
             <UIField Label="Notes" For="notes">
-                <InputTextArea id="notes" class="w-full min-w-0 px-3 py-2.5" @bind-Value="model.Notes" rows="4" />
+                <InputTextArea id="notes"
+                               class="w-full min-w-0 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80"
+                               @bind-Value="model.Notes"
+                               rows="4" />
             </UIField>
 
             <div class="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:flex-wrap sm:justify-end sm:gap-3">

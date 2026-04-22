@@ -121,7 +121,10 @@ else
                         <div class="grid min-w-0 grid-cols-2 gap-3 sm:gap-4">
                             <div class="min-w-0">
                                 <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Hour</span>
-                                <select id="occurredHour" class="w-full min-w-0 px-3 py-2.5" @bind="hourPart" @bind:after="SyncModelTimeFromParts">
+                                <select id="occurredHour"
+                                        class="w-full min-w-0 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80"
+                                        @bind="hourPart"
+                                        @bind:after="SyncModelTimeFromParts">
                                     @for (var h = 0; h < 24; h++)
                                     {
                                         <option value="@h">@h.ToString("00")</option>
@@ -130,7 +133,10 @@ else
                             </div>
                             <div class="min-w-0">
                                 <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Minute</span>
-                                <select id="occurredMinute" class="w-full min-w-0 px-3 py-2.5" @bind="minutePart" @bind:after="SyncModelTimeFromParts">
+                                <select id="occurredMinute"
+                                        class="w-full min-w-0 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80"
+                                        @bind="minutePart"
+                                        @bind:after="SyncModelTimeFromParts">
                                     @for (var m = 0; m < 60; m++)
                                     {
                                         <option value="@m">@m.ToString("00")</option>
@@ -208,7 +214,10 @@ else
                         <div class="grid min-w-0 grid-cols-2 gap-3 sm:gap-4">
                             <div class="min-w-0">
                                 <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Hour</span>
-                                <select id="observedUntilHour" class="w-full min-w-0 px-3 py-2.5" @bind="observedUntilHourPart" @bind:after="SyncObservedUntilTimeFromParts">
+                                <select id="observedUntilHour"
+                                        class="w-full min-w-0 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80"
+                                        @bind="observedUntilHourPart"
+                                        @bind:after="SyncObservedUntilTimeFromParts">
                                     @for (var h = 0; h < 24; h++)
                                     {
                                         <option value="@h">@h.ToString("00")</option>
@@ -217,7 +226,10 @@ else
                             </div>
                             <div class="min-w-0">
                                 <span class="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">Minute</span>
-                                <select id="observedUntilMinute" class="w-full min-w-0 px-3 py-2.5" @bind="observedUntilMinutePart" @bind:after="SyncObservedUntilTimeFromParts">
+                                <select id="observedUntilMinute"
+                                        class="w-full min-w-0 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80"
+                                        @bind="observedUntilMinutePart"
+                                        @bind:after="SyncObservedUntilTimeFromParts">
                                     @for (var m = 0; m < 60; m++)
                                     {
                                         <option value="@m">@m.ToString("00")</option>
@@ -288,7 +300,10 @@ else
             }
 
             <UIField Label="Notes" For="notes">
-                <InputTextArea id="notes" class="w-full min-w-0 px-3 py-2.5" @bind-Value="model.Notes" rows="4" />
+                <InputTextArea id="notes"
+                               class="w-full min-w-0 rounded-xl border border-slate-200/90 bg-white px-3 py-2.5 text-sm shadow-sm transition duration-200 ease-in-out hover:border-slate-300 hover:shadow-sm focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200/70 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:border-slate-600 dark:focus:ring-slate-800/80"
+                               @bind-Value="model.Notes"
+                               rows="4" />
             </UIField>
 
             <UIField Label="Photos" For="photos" Hint="Add more photos any time. Up to 25 MB each. Images are resized/compressed on upload for performance.">

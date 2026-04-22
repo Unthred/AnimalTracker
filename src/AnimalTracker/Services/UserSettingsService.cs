@@ -8,7 +8,7 @@ namespace AnimalTracker.Services;
 
 public sealed class UserSettingsService(
     ApplicationDbContext db,
-    CurrentUserService currentUser,
+    ICurrentUserAccessor currentUser,
     PhotoStorageService photos,
     AppSettingsService appSettings)
 {
